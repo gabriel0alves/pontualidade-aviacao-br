@@ -1,0 +1,88 @@
+# ---------------------------------------------------------------
+# Dados
+# ---------------------------------------------------------------
+# A camada bruta e reproduzivel via src/01_ingest.py e nao e versionada.
+# As camadas derivadas (interim, processed) tambem nao: sao reconstruiveis
+# pelo pipeline e pesam ~150 MB cada.
+#
+# NOTA: usa-se 'data/raw/*' e nao 'data/raw/' de proposito. O git nao
+# reavalia uma regra de negacao ('!...') dentro de um DIRETORIO excluido
+# -- "It is not possible to re-include a file if a parent directory of
+# that file is excluded". Com a barra no fim, o '!data/processed/amostra_*'
+# abaixo seria silenciosamente ineficaz.
+data/raw/*
+data/interim/*
+data/processed/*
+*.parcial
+
+# Amostras pequenas usadas na documentacao permanecem versionadas.
+!data/processed/amostra_*.csv
+
+# Preserva a estrutura de pastas no clone (arquivos .gitkeep vazios).
+!data/**/.gitkeep
+
+# ---------------------------------------------------------------
+# Credenciais e configuracao local
+# ---------------------------------------------------------------
+# O pipeline atual nao usa credencial alguma (a fonte da ANAC e publica e
+# anonima). Estas regras sao preventivas: se um dia entrar uma chave de API
+# ou string de conexao, ela nao vaza por descuido.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.*
+credentials.*
+*_secret*
+*_token*
+
+# ---------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Caches de ferramentas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Notebooks: limpar outputs antes de commitar (nbstripout ou "Clear All Outputs").
+# Outputs embutidos incham o repositorio e poluem o diff.
+
+# ---------------------------------------------------------------
+# Power BI
+# ---------------------------------------------------------------
+# .pbix e binario e pesado; versionar apenas o arquivo final publicado.
+*.pbix.bak
+TempSaves/
+
+# ---------------------------------------------------------------
+# Saidas geradas
+# ---------------------------------------------------------------
+# Figuras sao reproduziveis pelos scripts. Se alguma precisar ir para o
+# README, versione-a explicitamente com 'git add -f'.
+reports/figures/*
+!reports/figures/.gitkeep
+
+# ---------------------------------------------------------------
+# Sistema / editor
+# ---------------------------------------------------------------
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+*.tmp
