@@ -152,14 +152,24 @@ D.5 — ROBUSTEZ
 
   amplitude do ICA5: 51.8% a 65.6% (variacao de 13.8 pp)
 
---- POR GRUPO DE COMPANHIA ---
-grupo_companhia    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  taxa_atraso15_%
-           Azul 1912270           235981    24.7    58.4     77.3 0.877             12.6
+--- POR OPERADORA ANALITICA (recorte principal — D2) ---
+operadora_analitica    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  taxa_atraso15_%
+               Azul 1912270           235981    24.7    58.4     77.3 0.877             12.6
+       Azul Conecta   75792            17092    21.2    57.3     77.8 0.877             18.1
+                GOL 1435704           210500    25.6    53.2     70.8 0.850             15.5
+              LATAM 1540541           171662    20.8    50.6     70.1 0.848             13.1
+             Outros  208470            71984    27.1    60.0     76.9 0.872             22.9
+
+  amplitude do ICA5: 50.6% a 60.0% (variacao de 9.4 pp)
+
+--- POR GRUPO ECONOMICO (sensibilidade — D2) ---
+grupo_economico    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  taxa_atraso15_%
+           Azul 1988062           253074    24.8    58.8     77.5 0.878             12.9
             GOL 1435704           210500    25.6    53.2     70.8 0.850             15.5
           LATAM 1540541           171662    20.8    50.6     70.1 0.848             13.1
-         Outros  304497            91607    26.9    60.2     77.7 0.877             20.9
+         Outros  208470            71984    27.1    60.0     76.9 0.872             22.9
 
-  amplitude do ICA5: 50.6% a 60.2% (variacao de 9.6 pp)
+  amplitude do ICA5: 50.6% a 60.0% (variacao de 9.4 pp)
 
 --- POR AEROPORTO DE ORIGEM (top 12 por volume) ---
 aeroporto   voos  impacto_total_h  top1_%  ICA5_%  gini  taxa_atraso15_%
@@ -240,8 +250,9 @@ D.8 — INTERPRETACAO EM QUATRO NIVEIS
   - Os 5% de voos com maior atraso concentram 56.21% desse total.
   - Os 10% concentram 74.24%; os 20%, 92.28%.
   - Gini do impacto: 0.8657.
-  - A concentracao aparece em TODOS os anos (ICA5 entre 51.8% e 65.6%), em TODOS os grupos de
-    companhia (50.6% a 60.2%) e em TODOS os 12 maiores
+  - A concentracao aparece em TODOS os anos (ICA5 entre 51.8% e 65.6%), em TODAS as operadoras
+    (50.6% a 60.0%), em TODOS os grupos economicos
+    (50.6% a 60.0%) e em TODOS os 12 maiores
     aeroportos (45.0% a 62.2%).
   - Robusta ao corte de outliers: ICA5 varia de 53.8% a 56.7% entre
     cortes de 6h e sem corte.

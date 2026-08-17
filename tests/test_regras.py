@@ -66,23 +66,134 @@ def test_faixas_de_categoria_sao_coerentes():
     ]
 
 
-def test_grupos_de_companhia():
-    # Mapa por CODIGO ICAO. ACN/OWT deliberadamente FORA -- decisao pendente.
-    assert regras.GRUPOS_COMPANHIA == {"AZU": "Azul", "TAM": "LATAM", "GLO": "GOL"}
+def test_dimensao_de_companhia_tem_os_campos_exigidos():
+    """Decisao D2: operadora e grupo economico sao campos SEPARADOS."""
+    dim = regras.dim_companhia()
+    assert list(dim.columns) == [
+        "codigo_operacional", "operadora_analitica", "grupo_economico",
+        "segmento_operacional", "vigencia_inicio", "vigencia_fim",
+        "base_da_evidencia",
+    ]
+    assert regras.OPERADORA_RESIDUAL == "Outros"
     assert regras.GRUPO_RESIDUAL == "Outros"
+    assert regras.SEGMENTO_NAO_CLASSIFICADO == "nao_classificado"
 
 
-def test_acn_e_owt_nao_foram_consolidados_silenciosamente():
+def test_toda_linha_da_dimensao_tem_evidencia():
     """
-    Guarda explicita da decisao D2 (pendente).
-
-    OWT e ACN sao a mesma operadora (Two Taxi Aereo -> Azul Conecta, migracao
-    em nov/2021, frota 100% C208). Consolida-los em "Azul" e decisao de
-    negocio, nao de implementacao. Se alguem consolidar, este teste falha e
-    obriga a registrar a decisao em docs/status_projeto.md.
+    Regra de ouro da dimensao: nada entra sem evidencia rastreavel. Uma linha
+    sem justificativa seria opiniao disfarcada de dado.
     """
-    assert "ACN" not in regras.GRUPOS_COMPANHIA
-    assert "OWT" not in regras.GRUPOS_COMPANHIA
+    for linha in regras.dim_companhia().itertuples(index=False):
+        assert linha.base_da_evidencia and len(linha.base_da_evidencia) > 20, (
+            f"{linha.codigo_operacional} sem evidencia registrada"
+        )
+
+
+def test_vigencias_do_mesmo_codigo_nao_se_sobrepoem():
+    """
+    Duas linhas vigentes ao mesmo tempo para o mesmo codigo tornariam a
+    resolucao ambigua e dependente da ordem de iteracao.
+    """
+    dim = regras.dim_companhia()
+    for codigo, grupo in dim.groupby("codigo_operacional"):
+        g = grupo.sort_values("vigencia_inicio")
+        fins = g["vigencia_fim"].tolist()
+        inicios = g["vigencia_inicio"].tolist()
+        for i in range(len(g) - 1):
+            assert pd.notna(fins[i]), (
+                f"{codigo}: linha sem vigencia_fim seguida de outra linha"
+            )
+            assert fins[i] <= inicios[i + 1], (
+                f"{codigo}: vigencias sobrepostas em {fins[i]} / {inicios[i + 1]}"
+            )
+
+
+def test_d2_acn_e_owt_sao_a_mesma_operadora_com_grupo_azul():
+    """
+    Decisao D2 aprovada: operadora 'Azul Conecta', grupo economico 'Azul'.
+    A vigencia de OWT muda em 2021-06-01, data sustentada pela razao social na
+    fonte. Antes disso a operadora e Two Taxi Aereo e o grupo NAO e Azul.
+    """
+    r = regras.resolve_companhia(
+        pd.Series(["OWT", "OWT", "ACN"]),
+        pd.to_datetime(pd.Series(["2021-05-31", "2021-06-01", "2022-01-15"])),
+    )
+    assert r.iloc[0]["operadora_analitica"] == "Two Taxi Aereo"
+    assert r.iloc[0]["grupo_economico"] == "Independente"
+    assert r.iloc[1]["operadora_analitica"] == "Azul Conecta"
+    assert r.iloc[1]["grupo_economico"] == "Azul"
+    assert r.iloc[2]["operadora_analitica"] == "Azul Conecta"
+    assert r.iloc[2]["grupo_economico"] == "Azul"
+
+
+def test_operadora_e_grupo_sao_conceitos_distintos():
+    """
+    O ponto da D2: um campo nao pode representar os dois. A dimensao deve ter
+    ao menos um caso em que operadora e grupo economico divergem.
+    """
+    dim = regras.dim_companhia()
+    divergem = dim[dim["operadora_analitica"] != dim["grupo_economico"]]
+    assert len(divergem) > 0, (
+        "se operadora e grupo nunca divergem, a separacao da D2 e decorativa"
+    )
+
+
+def test_tipo_de_aeronave_nao_e_criterio_de_agrupamento():
+    """
+    Instrucao explicita da D2: a frota e variavel de CONTROLE, nao
+    justificativa do agrupamento. Ela nao pode aparecer na dimensao.
+    """
+    dim = regras.dim_companhia()
+    for coluna in ("operadora_analitica", "grupo_economico", "segmento_operacional"):
+        valores = " ".join(dim[coluna].astype(str)).upper()
+        assert "C208" not in valores and "CESSNA" not in valores
+    # mas deve estar registrada como caracteristica operacional
+    assert "C208" in regras.CARACTERISTICAS_OPERACIONAIS["ACN"]
+    assert "C208" in regras.CARACTERISTICAS_OPERACIONAIS["OWT"]
+
+
+def test_codigo_ambiguo_sem_data_cai_no_residual():
+    """
+    OWT tem duas vigencias. Sem data e impossivel saber o lado da fronteira, e
+    escolher um seria afirmar o que o dado nao diz.
+    """
+    r = regras.resolve_companhia(pd.Series(["OWT"]), pd.Series([pd.NaT]))
+    assert r.iloc[0]["operadora_analitica"] == regras.OPERADORA_RESIDUAL
+    assert r.iloc[0]["grupo_economico"] == regras.GRUPO_RESIDUAL
+
+
+def test_codigo_inequivoco_sem_data_e_resolvido():
+    """
+    AZU tem uma unica vigencia: um voo da AZU segue sendo da Azul mesmo sem
+    horario programado. Descartar a atribuicao seria pior que o comportamento
+    anterior a D2.
+    """
+    r = regras.resolve_companhia(pd.Series(["AZU", "ACN"]),
+                                 pd.Series([pd.NaT, pd.NaT]))
+    assert r.iloc[0]["operadora_analitica"] == "Azul"
+    assert r.iloc[0]["grupo_economico"] == "Azul"
+    assert r.iloc[1]["operadora_analitica"] == "Azul Conecta"
+
+
+def test_codigo_desconhecido_cai_no_residual():
+    r = regras.resolve_companhia(pd.Series(["ZZZ"]),
+                                 pd.to_datetime(pd.Series(["2023-01-01"])))
+    assert r.iloc[0]["operadora_analitica"] == regras.OPERADORA_RESIDUAL
+    assert r.iloc[0]["segmento_operacional"] == regras.SEGMENTO_NAO_CLASSIFICADO
+
+
+def test_segmento_nao_depende_de_data():
+    """
+    Segmento e atributo do OPERADOR, nao do voo: uma empresa de carga nao vira
+    de passageiros no meio do periodo. Deve resolver mesmo sem data.
+    """
+    r = regras.resolve_companhia(
+        pd.Series(["SID", "ABJ", "SID"]),
+        pd.Series([pd.NaT, pd.NaT, pd.Timestamp("2023-01-01")]))
+    assert r.iloc[0]["segmento_operacional"] == "carga"
+    assert r.iloc[1]["segmento_operacional"] == "taxi_aereo"
+    assert r.iloc[2]["segmento_operacional"] == "carga"
 
 
 def test_parametros_do_bloco_d():
@@ -91,6 +202,60 @@ def test_parametros_do_bloco_d():
     assert regras.PERCENTIL_ICA in regras.PERCENTIS_CONCENTRACAO
     assert regras.CORTES_SENSIBILIDADE_H == [6, 12, 24, 48, None]
     assert regras.SEMENTE_ALEATORIA == 42, "semente fixa mantem D.7 reproduzivel"
+
+
+def test_bloco_b_janela_ytd():
+    """
+    MESES_YTD define a janela do YTD homologo. Se divergir da cobertura real do
+    ano parcial, toda comparacao anual passa a comparar janelas diferentes --
+    exatamente o erro que a regra existe para evitar.
+    06_bloco_b_temporal.py confere este valor contra o dado e aborta se divergir.
+    """
+    assert regras.MESES_YTD == 6
+    assert 1 <= regras.MESES_YTD <= 12
+
+
+def test_bloco_b_regimes_cobrem_a_janela_sem_lacuna_nem_sobreposicao():
+    """
+    Um ano em dois regimes tornaria a segmentacao ambigua; um ano em nenhum
+    regime sairia silenciosamente das tabelas por regime.
+    """
+    anos_cobertos: list[int] = []
+    for _, inicio, fim, _ in regras.REGIMES_TEMPORAIS:
+        assert inicio <= fim
+        anos_cobertos.extend(range(inicio, fim + 1))
+    assert len(anos_cobertos) == len(set(anos_cobertos)), "ano em dois regimes"
+    assert set(anos_cobertos) == set(range(2019, 2027)), (
+        f"lacuna ou excesso na cobertura: {sorted(set(anos_cobertos))}"
+    )
+
+
+def test_bloco_b_regimes_tem_evidencia_e_estao_ordenados():
+    nomes = [n for n, _, _, _ in regras.REGIMES_TEMPORAIS]
+    assert nomes == sorted(nomes), "os nomes devem ordenar cronologicamente"
+    for nome, _, _, evidencia in regras.REGIMES_TEMPORAIS:
+        assert evidencia and len(evidencia) > 10, f"{nome} sem evidencia"
+
+
+@pytest.mark.parametrize(
+    "ano, esperado",
+    [
+        (2019, "1 pre-pandemia"),
+        (2020, "2 pandemia"),
+        (2021, "2 pandemia"),
+        (2022, "3 recuperacao"),
+        (2023, "4 pos-recuperacao"),
+        (2026, "4 pos-recuperacao"),
+    ],
+)
+def test_bloco_b_regime_do_ano(ano, esperado):
+    assert regras.regime_do_ano(ano) == esperado
+
+
+def test_bloco_b_ano_fora_da_janela_e_sinalizado():
+    """Nao pode devolver um regime plausivel para ano que a base nao cobre."""
+    assert regras.regime_do_ano(2018) == "fora dos regimes declarados"
+    assert regras.regime_do_ano(2030) == "fora dos regimes declarados"
 
 
 def test_corte_de_volume_e_distinto_do_top_n_de_aeroportos():
@@ -106,24 +271,39 @@ def test_corte_de_volume_e_distinto_do_top_n_de_aeroportos():
     assert regras.TOP_N_AEROPORTOS == 12
 
 
-def test_regras_de_chegada_continuam_ausentes():
+def test_d1_limite_da_chegada_e_simetrico_ao_da_partida():
     """
-    Guarda explicita da decisao D1 (pendente).
+    Decisao D1 aprovada: SIMETRIA. O limite da chegada e o MESMO da partida, de
+    proposito -- reusar LIMITE_ATRASO_MIN evita introduzir um limiar novo que
+    precisaria de justificativa propria. Se alguem desacoplar os dois, o
+    projeto passa a ter duas regras de plausibilidade concorrentes.
+    """
+    assert regras.LIMITE_ATRASO_CHEGADA_MIN == regras.LIMITE_ATRASO_MIN == 1440
 
-    O projeto NAO tem regra de plausibilidade para chegada. Enquanto isso for
-    verdade, nenhum limite deve aparecer em regras.py sem decisao registrada:
-    um valor provisorio silencioso e exatamente o risco que a auditoria
-    apontou.
+
+def test_d1_corte_de_sensibilidade_e_distinto_da_regra_em_vigor():
     """
-    for nome in (
-        "LIMITE_ATRASO_CHEGADA_MIN",
-        "CHEGADA_VALIDA",
-        "LIMITE_DURACAO_MIN",
-    ):
-        assert not hasattr(regras, nome), (
-            f"'{nome}' apareceu em regras.py. Se a decisao D1 foi tomada, "
-            "atualize docs/status_projeto.md e este teste no mesmo commit."
-        )
+    O corte de 6h e o CONTRASTE contra o qual a regra de 24h e avaliada, nunca
+    a regra aplicada. Confundir os dois mudaria a base do KPI 7.
+    """
+    assert regras.CORTE_SENSIBILIDADE_CHEGADA_H == 6
+    assert regras.CORTE_SENSIBILIDADE_CHEGADA_H * 60 < regras.LIMITE_ATRASO_CHEGADA_MIN
+
+
+def test_d1_motivos_de_invalidez_sao_exaustivos_e_ordenados():
+    """
+    A precedencia importa: garante um motivo UNICO por registro, para que a
+    soma dos motivos feche com o total de excluidos do KPI 7.
+    """
+    assert regras.MOTIVOS_INVALIDEZ_CHEGADA == (
+        "chegada_prevista_ausente",
+        "chegada_real_ausente",
+        "chegada_anterior_a_partida",
+        "atraso_chegada_acima_do_limite",
+        "partida_invalida",
+    )
+    assert len(set(regras.MOTIVOS_INVALIDEZ_CHEGADA)) == len(
+        regras.MOTIVOS_INVALIDEZ_CHEGADA), "motivos duplicados"
 
 
 @pytest.mark.parametrize(

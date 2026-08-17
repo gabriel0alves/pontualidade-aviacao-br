@@ -17,10 +17,10 @@ declarado ali é **P1, P2, P3, P6, P8, P11** e **H1–H4**.
 | Bloco | Tema | Responde | Estado |
 |---|---|---|---|
 | **A** | Universo analítico | — (fundação) | ✅ concluído |
-| **B** | Série temporal | P1, P2, KPI 6 | ⬜ não iniciado |
+| **B** | Série temporal | P1, P2, KPI 6 | ✅ concluído |
 | **C** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ⬜ não iniciado |
 | **D** | Concentração do impacto | H1, P2 | ✅ concluído |
-| **E** | Aeroporto vs companhia | H2, P3, P6 | ⛔ bloqueado |
+| **E** | Aeroporto vs companhia | H2, P3, P6 | ⬜ desbloqueado (D2 aprovada) |
 | **F** | Priorização | P11 | ⬜ depende de C e E |
 | **G** | Visualização e dashboard | — (comunicação) | ⬜ depende de B–F |
 
@@ -47,8 +47,9 @@ Regras R1–R9, cada uma reportando quantos registros afeta:
 | R5 | flag `atraso_valido` (partida) | 5.193.012 válidos; 575 outliers marcados, não removidos |
 | R6 | `categoria_atraso` + flags acumuladas | 83,55% pontuais; flags `boolean` anuláveis |
 | R7 | `assentos_valido` | 96,53% válidos |
-| R8 | dimensões derivadas | ano, mês, dia da semana, hora, rota, grupo |
+| R8 | dimensões derivadas + **dimensão de companhia com vigência** | ano, mês, dia da semana, hora, rota, `operadora_analitica`, `grupo_economico`, `segmento_operacional` |
 | R9 | flag `ano_parcial` | 2026 marcado |
+| **R10** | **validade da chegada** (decisão D1) | 5.192.866 na base do KPI 7; 259.429 excluídos com motivo registrado |
 
 **Pendências conhecidas do bloco A:**
 
@@ -57,28 +58,33 @@ Regras R1–R9, cada uma reportando quantos registros afeta:
   chaves de agrupamento aparecem como `2019.0`. Cosmético hoje; virará atrito
   em joins e no Power BI.
 - Não existe `faixa_horaria` — só `hora_prevista`. **P11 depende dela.**
-- Não existe flag de validade para chegada. **Bloqueia o KPI 7.**
+- ~~Não existe flag de validade para chegada.~~ **RESOLVIDO por R10** (decisão
+  D1, 2026-08-17): `chegada_valida`, `atraso_chegada_valido`,
+  `recuperacao_valida` e `motivo_invalidez_chegada`.
+- ~~`grupo_companhia` é mapa por código, sem vigência.~~ **RESOLVIDO por R8**
+  (decisão D2): `operadora_analitica`, `grupo_economico` e
+  `segmento_operacional`, resolvidos por vigência.
 
 ---
 
-## Bloco B — Série temporal ⬜
+## Bloco B — Série temporal ✅
+
+**Script:** `src/06_bloco_b_temporal.py` · **Saída:** `docs/eda_bloco_b.md`
 
 **Responde:** P1 (evolução do OTP15 com a quebra da pandemia), P2 (a
 concentração mudou ao longo do tempo?), KPI 6 (cancelamento).
 
-**Entregar:**
+Oito seções: bases de cálculo distintas (B.1), demonstração de por que o YTD
+homólogo não é opcional (B.2), regimes temporais (B.3), P1 em YTD / ano fechado
+/ mensal / sazonalidade (B.4), P2 e correlação volume × concentração (B.5),
+KPI 6 (B.6), sensibilidade ao segmento operacional (B.7), interpretação em
+quatro níveis (B.8).
 
-1. Série mensal e anual do OTP15, com 2026 marcado como parcial.
-2. Comparação **YTD homóloga** (jan–jun de cada ano) — obrigatória, não
-   opcional.
-3. Taxa de cancelamento por mês e por companhia. Os 144.780 cancelados do
-   universo estão hoje **intocados**; 1.307 registros `NÃO INFORMADO` ficam fora
-   do denominador e isso precisa ser declarado.
-4. Série do ICA5 por ano — os números já existem em `eda_bloco_d.md` D.5, falta
-   a leitura formal de P2.
+**Resultados:** OTP15 em YTD varia de 84,53% (2026) a 93,28% (2021); a taxa de
+cancelamento de 1,78% a 3,64%; a concentração persiste em todos os anos.
 
-**Cuidado:** a quebra de 2020–2021 cruza regimes distintos. Nenhuma tendência
-2019→2026 deve ser apresentada como linha única.
+**Ainda aberto neste bloco:** H6 (sazonalidade) segue extensão futura — B.4.d
+descreve o mês médio, mas não testa recorrência entre anos.
 
 ---
 
@@ -116,18 +122,19 @@ H1 confirmada: ICA5 = 56,21%, Gini = 0,8657, robusta em todos os eixos testados.
 
 ---
 
-## Bloco E — Aeroporto vs companhia ⛔
+## Bloco E — Aeroporto vs companhia ⬜
 
 **Responde:** H2, P3, P6 — o coração do diagnóstico e o bloco mais valioso do
 projeto.
 
-**Bloqueado por:** a dimensão de companhia não tem vigência temporal. `OWT` e
-`ACN` são a mesma operadora (Two Táxi Aéreo → Azul Conecta, migração em
-nov/2021, mesma frota 100% C208), mas contam como dois operadores distintos, e
-ambos caem em "Outros". Qualquer decomposição de variância entre companhias
-herdaria esse erro. Ver `status_projeto.md`, decisão **D2**.
+**Desbloqueado** pela decisão D2 (2026-08-17): a dimensão de companhia agora
+tem vigência. Em H2/P3/P6, **`operadora_analitica` é o recorte principal** e
+`grupo_economico` é a análise de sensibilidade. `modelo_equipamento` entra como
+**variável de controle**, nunca como critério de agrupamento.
 
-**Entregar quando desbloqueado:**
+**Ainda depende de:** `faixa_horaria`, do Bloco C, para P6.
+
+**Entregar:**
 
 1. Variância do OTP15 entre companhias **dentro** do mesmo aeroporto vs
    variância entre aeroportos **dentro** da mesma companhia (H2).
@@ -173,11 +180,11 @@ parcial.
 
 | # | Item | Impacto |
 |---|---|---|
-| 1 | Sem orquestração (`run_all` / Makefile) — os 5 scripts rodam por convenção de nome | reprodutibilidade |
+| 1 | Sem orquestração (`run_all` / Makefile) — os 6 scripts rodam por convenção de nome | reprodutibilidade |
 | 2 | `matplotlib` e `duckdb` pinados sem uso | dependência morta |
 | 3 | `ano`/`mes`/`hora_prevista` como `double` | atrito em join e BI |
 | 4 | `voo_domestico` é constante `True` no universo | coluna inútil |
-| 5 | `VOLUME_MINIMO_RECORTE` sem análise de sensibilidade | corte não justificado empiricamente |
+| 5 | `VOLUME_MINIMO_RECORTE` sem análise de sensibilidade — e **deixou de ser inerte** após D2: exclui agora `Two Taxi Aereo` / `Independente` (20.235 voos) | corte não justificado empiricamente |
 | 6 | `TOP_N_AEROPORTOS = 12` é regra distinta do corte de volume (daria 22 aeroportos) | comparabilidade entre tabelas |
 | 7 | Grafia duplicada `Atraso > 240` / `Atraso >240` em `situacao_partida` | só importa se o campo da fonte for usado |
 | 8 | Domínios de `codigo_di` e `codigo_tipo_linha` — consulta à GEAC/ANAC pendente | segmentação sem semântica |

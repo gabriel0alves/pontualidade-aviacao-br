@@ -41,6 +41,11 @@ COLUNAS_DERIVADAS = [
     "atrasado_15", "atrasado_30", "atrasado_60", "assentos_valido",
     "ano", "mes", "ano_mes", "dia_semana", "hora_prevista", "rota",
     "grupo_companhia", "ano_parcial",
+    # decisao D2
+    "operadora_analitica", "grupo_economico", "segmento_operacional",
+    # decisao D1 (R10)
+    "chegada_valida", "atraso_chegada_valido", "recuperacao_valida",
+    "motivo_invalidez_chegada",
 ]
 
 # Valores de referencia, reproduzidos na auditoria de 2026-08-17.
@@ -49,6 +54,10 @@ N_ATRASO_VALIDO = 5_193_012
 ICA5_REFERENCIA = 0.5621
 GINI_REFERENCIA = 0.8657
 IMPACTO_TOTAL_MIN = 42_584_980
+
+# Decisao D1: base do KPI 7 apos a regra de validade da chegada.
+N_ATRASO_CHEGADA_VALIDO = 5_192_866
+KPI7_MEDIANA_REFERENCIA = -3.0
 
 
 # ------------------------------------------------------------------- esquema
@@ -226,28 +235,93 @@ def test_coerencia_cronologica_da_partida(caminho_universo):
     assert delta.abs().max() <= regras.LIMITE_ATRASO_MIN
 
 
-@pytest.mark.xfail(
-    reason="DECISAO PENDENTE D1: nao existe regra de validade para chegada. "
-           "655 registros tem |atraso_chegada| > 24h, dos quais 145 com "
-           "atraso_valido=True. Ver docs/status_projeto.md.",
-    strict=True,
-)
-def test_coerencia_cronologica_da_chegada(caminho_universo):
+def test_r10_coerencia_cronologica_da_chegada(caminho_universo):
     """
-    Este teste DEVE falhar hoje, e a falha e o registro executavel do risco.
+    Decisao D1 implementada. Este teste era xfail(strict=True) enquanto a regra
+    nao existia; agora deve passar.
 
-    Quando a decisao D1 for tomada e a flag de validade de chegada existir,
-    remova o xfail: o teste deve passar. 'strict=True' garante que, se ele
-    passar por acidente antes da decisao, o pytest acusa XPASS como erro.
+    Onde atraso_chegada_valido, a chegada tem de ser cronologicamente coerente
+    e dentro do limite de plausibilidade.
     """
     df = pd.read_parquet(caminho_universo, columns=[
-        "atraso_valido", "atraso_chegada_min", "chegada_real", "partida_real"])
-    v = df[df["atraso_valido"]]
-    assert (v["atraso_chegada_min"].abs() <= regras.LIMITE_ATRASO_MIN).all(), (
-        f"{int((v['atraso_chegada_min'].abs() > regras.LIMITE_ATRASO_MIN).sum())} "
-        "registros com atraso de chegada implausivel"
-    )
+        "atraso_chegada_valido", "atraso_chegada_min",
+        "chegada_real", "partida_real"])
+    v = df[df["atraso_chegada_valido"]]
+    fora = int((v["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN).sum())
+    assert fora == 0, f"{fora} registros com atraso de chegada implausivel"
     assert (v["chegada_real"] >= v["partida_real"]).all()
+
+
+def test_r10_base_do_kpi7(caminho_universo):
+    """A base do KPI 7 exige partida E chegada validas (decisao D1)."""
+    df = pd.read_parquet(caminho_universo, columns=[
+        "atraso_valido", "chegada_valida", "atraso_chegada_valido",
+        "recuperacao_valida", "recuperacao_min", "atraso_chegada_min"])
+    assert int(df["atraso_chegada_valido"].sum()) == N_ATRASO_CHEGADA_VALIDO
+    # atraso_chegada_valido = atraso_valido AND chegada_valida, exatamente
+    esperado = df["atraso_valido"] & df["chegada_valida"]
+    assert df["atraso_chegada_valido"].equals(esperado)
+    # recuperacao_valida e a mesma condicao, por construcao
+    assert df["recuperacao_valida"].equals(df["atraso_chegada_valido"])
+    # onde valido, os campos derivados nao podem ser nulos
+    v = df[df["atraso_chegada_valido"]]
+    assert v["recuperacao_min"].notna().all()
+    assert v["atraso_chegada_min"].notna().all()
+    # a base do KPI 7 e subconjunto da base de partida
+    assert int(df["atraso_chegada_valido"].sum()) <= N_ATRASO_VALIDO
+
+
+def test_r10_motivo_de_invalidez_e_unico_e_fecha_a_conta(caminho_universo):
+    """
+    Cada registro excluido do KPI 7 tem UM motivo, e a soma dos motivos fecha
+    com o total de excluidos. Sem isso a auditoria do filtro seria impossivel.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "atraso_chegada_valido", "motivo_invalidez_chegada"])
+    validos = df["atraso_chegada_valido"]
+    # motivo preenchido exatamente onde invalido
+    assert df.loc[validos, "motivo_invalidez_chegada"].isna().all(), (
+        "registro valido nao pode ter motivo de invalidez"
+    )
+    assert df.loc[~validos, "motivo_invalidez_chegada"].notna().all(), (
+        "registro invalido sem motivo registrado"
+    )
+    contagem = df["motivo_invalidez_chegada"].value_counts()
+    assert contagem.sum() == len(df) - N_ATRASO_CHEGADA_VALIDO
+    # todos os motivos observados tem de estar declarados em regras.py
+    assert set(contagem.index) <= set(regras.MOTIVOS_INVALIDEZ_CHEGADA), (
+        f"motivo nao declarado: {set(contagem.index) - set(regras.MOTIVOS_INVALIDEZ_CHEGADA)}"
+    )
+
+
+def test_r10_registros_invalidos_foram_preservados(caminho_universo):
+    """
+    Principio do projeto, reafirmado na D1: invalido e marcado, nunca apagado.
+    Os 655 registros com |atraso_chegada| > 24h devem seguir na base.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "atraso_chegada_min", "atraso_chegada_valido", "motivo_invalidez_chegada"])
+    extremos = df[df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN]
+    assert len(extremos) > 0, "os registros extremos de chegada desapareceram"
+    assert not extremos["atraso_chegada_valido"].any()
+    assert extremos["motivo_invalidez_chegada"].notna().all()
+
+
+def test_r10_kpi7_mediana_estavel_e_extremos_tratados(caminho_universo):
+    """
+    Valida o impacto declarado da D1: a mediana do KPI 7 nao muda, mas os
+    valores extremos saem da base de calculo.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "recuperacao_valida", "recuperacao_min"])
+    kpi7 = df.loc[df["recuperacao_valida"], "recuperacao_min"]
+    assert kpi7.median() == pytest.approx(KPI7_MEDIANA_REFERENCIA)
+    # o caso patologico de +1.052.631 min tem de estar fora
+    assert kpi7.abs().max() <= 2 * regras.LIMITE_ATRASO_CHEGADA_MIN, (
+        f"maximo de {kpi7.abs().max():,.0f} min ainda na base do KPI 7"
+    )
+    # e a base sem filtro ainda contem o extremo, preservado
+    assert df["recuperacao_min"].abs().max() > 1_000_000
 
 
 # ---------------------------------------------- estabilidade dos resultados
@@ -300,27 +374,117 @@ def test_top_5_pct_cabe_no_conjunto_de_impacto_positivo(caminho_universo):
 
 # -------------------------------------------------------- grupo_companhia
 
-def test_grupo_companhia_consistente_com_o_mapa(caminho_universo):
+def test_d2_dimensao_aplicada_bate_com_o_resolvedor(caminho_universo):
+    """
+    O artefato tem de refletir exatamente regras.resolve_companhia. Se
+    divergir, existe uma segunda implementacao do agrupamento em algum lugar.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "sigla_icao_empresa", "partida_prevista", "operadora_analitica",
+        "grupo_economico", "segmento_operacional"])
+    esperado = regras.resolve_companhia(
+        df["sigla_icao_empresa"], df["partida_prevista"])
+    for coluna in ("operadora_analitica", "grupo_economico", "segmento_operacional"):
+        divergentes = int((df[coluna] != esperado[coluna]).sum())
+        assert divergentes == 0, f"{coluna}: {divergentes} registros divergentes"
+
+
+def test_d2_grupo_companhia_e_alias_de_grupo_economico(caminho_universo):
+    """
+    'grupo_companhia' foi mantido apenas para compatibilidade. Se deixar de ser
+    alias, os artefatos antigos passam a significar outra coisa em silencio.
+    """
     df = pd.read_parquet(caminho_universo,
-                         columns=["sigla_icao_empresa", "grupo_companhia"])
-    df["sigla_icao_empresa"] = df["sigla_icao_empresa"].astype(str)
-    for codigo, grupo in regras.GRUPOS_COMPANHIA.items():
-        sub = df[df["sigla_icao_empresa"] == codigo]
-        if len(sub):
-            assert (sub["grupo_companhia"] == grupo).all(), (
-                f"{codigo} deveria estar em '{grupo}'"
-            )
-    mapeados = set(regras.GRUPOS_COMPANHIA)
-    residual = df[~df["sigla_icao_empresa"].isin(mapeados)]
-    assert (residual["grupo_companhia"] == regras.GRUPO_RESIDUAL).all()
+                         columns=["grupo_companhia", "grupo_economico"])
+    assert df["grupo_companhia"].equals(df["grupo_economico"])
 
 
-def test_grupos_observados_sao_os_declarados(caminho_universo):
-    df = pd.read_parquet(caminho_universo, columns=["grupo_companhia"])
-    observados = set(df["grupo_companhia"].unique())
-    declarados = set(regras.GRUPOS_COMPANHIA.values()) | {regras.GRUPO_RESIDUAL}
-    assert observados == declarados, (
-        f"grupos inesperados: {observados ^ declarados}"
+def test_d2_valores_observados_sao_os_declarados(caminho_universo):
+    df = pd.read_parquet(caminho_universo, columns=[
+        "operadora_analitica", "grupo_economico", "segmento_operacional"])
+    dim = regras.dim_companhia()
+
+    obs_oper = set(df["operadora_analitica"].unique())
+    decl_oper = set(dim["operadora_analitica"]) | {regras.OPERADORA_RESIDUAL}
+    assert obs_oper <= decl_oper, f"operadora inesperada: {obs_oper - decl_oper}"
+
+    obs_grupo = set(df["grupo_economico"].unique())
+    decl_grupo = set(dim["grupo_economico"]) | {regras.GRUPO_RESIDUAL}
+    assert obs_grupo <= decl_grupo, f"grupo inesperado: {obs_grupo - decl_grupo}"
+
+    obs_seg = set(df["segmento_operacional"].unique())
+    decl_seg = set(dim["segmento_operacional"]) | {
+        "carga", "taxi_aereo", regras.SEGMENTO_NAO_CLASSIFICADO}
+    assert obs_seg <= decl_seg, f"segmento inesperado: {obs_seg - decl_seg}"
+
+
+def test_d2_azul_mainline_e_conecta_sao_operadoras_distintas(caminho_universo):
+    """
+    O ganho concreto da D2: 'Azul' (mainline) e 'Azul Conecta' passam a ser
+    operadoras separadas, mas somam no mesmo grupo economico.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "operadora_analitica", "grupo_economico"])
+    mainline = int((df["operadora_analitica"] == "Azul").sum())
+    conecta = int((df["operadora_analitica"] == "Azul Conecta").sum())
+    grupo = int((df["grupo_economico"] == "Azul").sum())
+    assert mainline > 0 and conecta > 0
+    assert mainline + conecta == grupo, (
+        "grupo economico Azul deve ser exatamente mainline + Conecta"
+    )
+
+
+def test_d3_segmento_nao_filtra_nada_ainda(caminho_universo):
+    """
+    Decisao D3 PENDENTE: o segmento e atributo descritivo. Carga e taxi aereo
+    devem seguir PRESENTES no universo -- se desaparecerem, alguem aplicou D3
+    sem registrar a decisao.
+    """
+    df = pd.read_parquet(caminho_universo, columns=["segmento_operacional"])
+    contagem = df["segmento_operacional"].value_counts()
+    assert contagem.get("carga", 0) == 91_722
+    assert contagem.get("taxi_aereo", 0) == 8_266
+
+
+def test_bloco_b_janela_ytd_confere_com_o_dado(caminho_universo):
+    """
+    Trava do parametro MESES_YTD contra a realidade da base. Quando a janela da
+    ANAC avancar (jul/2026 em diante), este teste falha e obriga a revisar a
+    regra antes que alguma serie compare janelas diferentes em silencio.
+    """
+    df = pd.read_parquet(caminho_universo, columns=["ano", "mes", "ano_parcial"])
+    parciais = df.loc[df["ano_parcial"], ["ano", "mes"]].dropna()
+    assert len(parciais) > 0, "nenhum ano parcial na base"
+    for ano, grupo in parciais.groupby("ano"):
+        assert int(grupo["mes"].max()) == regras.MESES_YTD, (
+            f"ano parcial {ano:.0f} cobre {int(grupo['mes'].max())} meses, "
+            f"mas regras.MESES_YTD = {regras.MESES_YTD}"
+        )
+
+
+def test_bloco_b_todo_ano_com_data_tem_regime(caminho_universo):
+    """Nenhum ano da base pode ficar fora dos regimes declarados."""
+    df = pd.read_parquet(caminho_universo, columns=["ano"])
+    anos = sorted({int(a) for a in df["ano"].dropna().unique()})
+    for ano in anos:
+        assert regras.regime_do_ano(ano) != "fora dos regimes declarados", (
+            f"ano {ano} presente na base mas fora de REGIMES_TEMPORAIS"
+        )
+
+
+def test_bloco_b_denominador_do_kpi6_exclui_nao_informado(caminho_universo):
+    """
+    KPI 6 = CANCELADO / (REALIZADO + CANCELADO). 'NÃO INFORMADO' fica fora do
+    denominador: sem desfecho declarado nao se pode afirmar nem cancelamento
+    nem realizacao. Se entrar, a taxa e diluida silenciosamente.
+    """
+    df = pd.read_parquet(caminho_universo, columns=["situacao_voo"])
+    contagem = df["situacao_voo"].value_counts()
+    assert set(contagem.index) == {"REALIZADO", "CANCELADO", "NÃO INFORMADO"}
+    denominador = int(contagem["REALIZADO"] + contagem["CANCELADO"])
+    assert denominador == len(df) - int(contagem["NÃO INFORMADO"])
+    assert int(contagem["NÃO INFORMADO"]) > 0, (
+        "se nao ha 'NÃO INFORMADO', a ressalva do KPI 6 ficou obsoleta"
     )
 
 

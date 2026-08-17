@@ -108,14 +108,47 @@ validos: 5,262,989 (96.53%)
 --------------------------------------------------------------------------
 R8 — DIMENSOES DERIVADAS
 --------------------------------------------------------------------------
-criadas: ano, mes, ano_mes, dia_semana, hora_prevista, rota, grupo_companhia
+criadas: ano, mes, ano_mes, dia_semana, hora_prevista, rota,
+         operadora_analitica, grupo_economico, segmento_operacional
+         (grupo_companhia mantido como alias de grupo_economico)
 
+--- dimensao de companhia aplicada (D2) ---
+codigo_operacional operadora_analitica grupo_economico segmento_operacional vigencia_inicio vigencia_fim                                                           base_da_evidencia
+               AZU                Azul            Azul          passageiros      2019-01-01          NaT razao social constante 'AZUL LINHAS AEREAS BRASILEIRAS S/A' nos 90 arquivos
+               TAM               LATAM           LATAM          passageiros      2019-01-01          NaT             razao social constante 'TAM LINHAS AEREAS S.A.' nos 90 arquivos
+               GLO                 GOL             GOL          passageiros      2019-01-01          NaT             razao social constante 'GOL LINHAS AEREAS S.A.' nos 90 arquivos
+               OWT      Two Taxi Aereo    Independente passageiros_regional      2019-01-01   2021-06-01        razao social 'TWO TAXI AEREO LTDA.' na fonte ate 2021-05 (mes cheio)
+               OWT        Azul Conecta            Azul passageiros_regional      2021-06-01   2021-12-01              razao social 'AZUL CONECTA LTDA.' na fonte a partir de 2021-06
+               ACN        Azul Conecta            Azul passageiros_regional      2021-11-01          NaT      razao social 'AZUL CONECTA LTDA.' na fonte em todo o periodo do codigo
+
+por OPERADORA ANALITICA (recorte principal de H2/P3/P6):
+                        voos    pct
+operadora_analitica                
+Azul                 1998164  36.65
+LATAM                1579365  28.97
+GOL                  1489615  27.32
+Outros                254776   4.67
+Azul Conecta          106336   1.95
+Two Taxi Aereo         24039   0.44
+
+por GRUPO ECONOMICO (analise de sensibilidade):
                     voos    pct
-grupo_companhia                
-Azul             1998164  36.65
+grupo_economico                
+Azul             2104500  38.60
 LATAM            1579365  28.97
 GOL              1489615  27.32
-Outros            385151   7.06
+Outros            254776   4.67
+Independente       24039   0.44
+
+por SEGMENTO OPERACIONAL (atributo descritivo; decisao D3 PENDENTE --
+  o segmento NAO filtra nenhuma analise enquanto D3 estiver aberta):
+                         voos    pct
+segmento_operacional                
+passageiros           5067144  92.94
+nao_classificado       153281   2.81
+passageiros_regional   131882   2.42
+carga                   91722   1.68
+taxi_aereo               8266   0.15
 
 --------------------------------------------------------------------------
 R9 — ANOS PARCIAIS
@@ -136,6 +169,46 @@ anos marcados como PARCIAIS: [2026.0]
 -> criada flag 'ano_parcial'. Comparacoes de volume anual devem usar
    YTD homologo; anualizacao e proibida (ver docs/definicao_do_case.md).
 
+--------------------------------------------------------------------------
+R10 — VALIDADE DA CHEGADA (KPI 7)
+--------------------------------------------------------------------------
+regra aprovada (decisao D1): SIMETRIA COM A PARTIDA
+  [1] chegada_prevista E chegada_real preenchidas
+  [2] |atraso_chegada_min| <= 1440 min (24h) — mesmo limite de R5
+  [3] chegada_real >= partida_real (coerencia cronologica)
+  atraso_chegada_valido = atraso_valido AND chegada_valida
+
+chegada_valida            : 5,192,931
+atraso_chegada_valido     : 5,192,866 (95.24% do universo)
+  base do KPI 7 (partida E chegada validas)
+
+motivos de exclusao do KPI 7 (um motivo por registro, sem sobreposicao):
+                                registros     pct
+motivo_invalidez_chegada                         
+chegada_real_ausente               146085  2.6793
+chegada_prevista_ausente           112623  2.0656
+atraso_chegada_acima_do_limite        655   0.012
+partida_invalida                       65  0.0012
+chegada_anterior_a_partida              1     0.0
+total excluido            : 259,429
+conferencia (universo - validos): 259,429
+-> registros invalidos NAO foram removidos; seguem auditaveis com o
+   motivo registrado em 'motivo_invalidez_chegada'.
+
+IMPACTO SOBRE O KPI 7 (recuperacao em voo, em minutos):
+                             cenario       n  mediana  media  soma_h  minimo  maximo
+ antes de D1 (sem filtro de chegada) 5193587     -3.0 -2.403 -207980   -1390 1052631
+regra D1 aprovada (24h + cronologia) 5192866     -3.0 -2.613 -226142   -1390    1363
+          sensibilidade: corte de 6h 5187317     -3.0 -2.616 -226209    -776     353
+
+-> a MEDIANA e imune ao tratamento (-3.0 -> -3.0 min):
+   e por isso que o KPI 7 foi definido como mediana no case.
+-> a MEDIA desloca de -2.403 para -2.613 min, e o
+   maximo cai de 1,052,631 para 1,363 min.
+-> o corte de 6h excluiria 5,549 registros a mais e levaria a media
+   a -2.616 min. A regra de 24h foi a escolhida por reusar o
+   limite ja documentado em R5, sem introduzir limiar novo.
+
 ==========================================================================
 FUNIL DO UNIVERSO ANALITICO
 ==========================================================================
@@ -149,6 +222,7 @@ UNIVERSO FINAL
 ==========================================================================
 registros na base tratada     : 5,452,295
   com atraso_valido = True    : 5,193,012 (95.24%)
+  com atraso_chegada_valido   : 5,192,866 (95.24%)
   cancelados                  : 144,780
 periodo                       : 2019-01-01 00:00:00 a 2026-06-30 23:55:00
 companhias                    : 130
@@ -156,5 +230,5 @@ aeroportos (origem)           : 292
 rotas                         : 3,737
 
 gravado: D:\Projetos\PortifolioAnaliseDeDados\pontualidade-aviacao-br\data\processed\voos.parquet
-tamanho: 157.9 MB
+tamanho: 159.1 MB
 ```

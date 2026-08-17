@@ -79,7 +79,8 @@ def main() -> int:
     r = Rel()
     df = pd.read_parquet(ENTRADA, columns=[
         "atraso_partida_min", "atraso_valido", "situacao_voo", "ano",
-        "grupo_companhia", "sigla_icao_empresa", "icao_origem", "ano_parcial"])
+        "operadora_analitica", "grupo_economico", "sigla_icao_empresa",
+        "icao_origem", "ano_parcial"])
 
     # ------------------------------------------------------------------
     r.sec("D.1 — DEFINICAO DO UNIVERSO DE CALCULO")
@@ -255,7 +256,14 @@ def main() -> int:
         return t
 
     t_ano = bloco_robustez("ano", "POR ANO")
-    t_grupo = bloco_robustez("grupo_companhia", "POR GRUPO DE COMPANHIA")
+    # Decisao D2: operadora analitica e o recorte PRINCIPAL; grupo economico
+    # entra como analise de SENSIBILIDADE. Operadora e estavel atraves de
+    # mudanca de codigo ICAO (caso OWT -> ACN); grupo responde a outra
+    # pergunta -- quem controla.
+    t_oper = bloco_robustez("operadora_analitica",
+                            "POR OPERADORA ANALITICA (recorte principal — D2)")
+    t_grupo = bloco_robustez("grupo_economico",
+                             "POR GRUPO ECONOMICO (sensibilidade — D2)")
 
     r(f"\n--- POR AEROPORTO DE ORIGEM (top {TOP_N_AEROPORTOS} por volume) ---")
     top_aero = base["icao_origem"].value_counts().head(TOP_N_AEROPORTOS).index
@@ -390,8 +398,9 @@ def main() -> int:
     r(f"  - Os 10% concentram {share_topo(v,10):.2%}; os 20%, {share_topo(v,20):.2%}.")
     r(f"  - Gini do impacto: {gini(v):.4f}.")
     r(f"  - A concentracao aparece em TODOS os anos (ICA5 entre "
-      f"{t_ano['ICA5_%'].min():.1f}% e {t_ano['ICA5_%'].max():.1f}%), em TODOS os grupos de")
-    r(f"    companhia ({t_grupo['ICA5_%'].min():.1f}% a {t_grupo['ICA5_%'].max():.1f}%) e em TODOS os 12 maiores")
+      f"{t_ano['ICA5_%'].min():.1f}% e {t_ano['ICA5_%'].max():.1f}%), em TODAS as operadoras")
+    r(f"    ({t_oper['ICA5_%'].min():.1f}% a {t_oper['ICA5_%'].max():.1f}%), em TODOS os grupos economicos")
+    r(f"    ({t_grupo['ICA5_%'].min():.1f}% a {t_grupo['ICA5_%'].max():.1f}%) e em TODOS os 12 maiores")
     r(f"    aeroportos ({t_aero['ICA5_%'].min():.1f}% a {t_aero['ICA5_%'].max():.1f}%).")
     r(f"  - Robusta ao corte de outliers: ICA5 varia de "
       f"{t_sens['ICA5_%'].min():.1f}% a {t_sens['ICA5_%'].max():.1f}% entre")

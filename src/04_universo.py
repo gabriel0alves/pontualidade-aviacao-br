@@ -24,15 +24,17 @@ import pandas as pd
 # divergem silenciosamente na primeira alteracao.
 from regras import (
     CHAVE_NATURAL,
-    GRUPO_RESIDUAL,
-    GRUPOS_COMPANHIA,
+    CORTE_SENSIBILIDADE_CHEGADA_H,
     JANELA_FIM,
     JANELA_INICIO,
     LIMIARES_SEVERIDADE,
+    LIMITE_ATRASO_CHEGADA_MIN,
     LIMITE_ATRASO_MIN,
     LIMITES_CATEGORIA,
     PREFIXOS_ICAO_BR,
     ROTULOS_CATEGORIA,
+    dim_companhia,
+    resolve_companhia,
 )
 
 BASE = Path(__file__).resolve().parents[1]
@@ -282,13 +284,38 @@ def main() -> int:
     df["hora_prevista"] = df["partida_prevista"].dt.hour
     df["rota"] = (df["icao_origem"].astype(str) + "-" + df["icao_destino"].astype(str))
 
-    # Mapa por CODIGO ICAO, sem vigencia temporal -- ver regras.py para o
-    # limite conhecido (caso OWT -> ACN) e a decisao pendente.
-    df["grupo_companhia"] = (df["sigla_icao_empresa"].astype(str)
-                             .map(GRUPOS_COMPANHIA).fillna(GRUPO_RESIDUAL))
-    log("criadas: ano, mes, ano_mes, dia_semana, hora_prevista, rota, grupo_companhia")
+    # Dimensao de companhia COM VIGENCIA (decisao D2). Operadora e grupo
+    # economico sao campos separados, resolvidos por (codigo, data do voo)
+    # atraves de regras.resolve_companhia -- unica implementacao da consulta.
+    resolvido = resolve_companhia(df["sigla_icao_empresa"], df["partida_prevista"])
+    df["operadora_analitica"] = resolvido["operadora_analitica"]
+    df["grupo_economico"] = resolvido["grupo_economico"]
+    df["segmento_operacional"] = resolvido["segmento_operacional"]
+
+    # 'grupo_companhia' e MANTIDO como alias de grupo_economico para nao
+    # quebrar 05_bloco_d_concentracao.py e os artefatos ja publicados. Novas
+    # analises devem usar operadora_analitica (recorte principal de H2/P3/P6)
+    # ou grupo_economico (sensibilidade).
+    df["grupo_companhia"] = df["grupo_economico"]
+
+    log("criadas: ano, mes, ano_mes, dia_semana, hora_prevista, rota,")
+    log("         operadora_analitica, grupo_economico, segmento_operacional")
+    log("         (grupo_companhia mantido como alias de grupo_economico)")
     log("")
-    log(df["grupo_companhia"].value_counts().to_frame("voos").assign(
+    log("--- dimensao de companhia aplicada (D2) ---")
+    log(dim_companhia().to_string(index=False))
+    log("")
+    log("por OPERADORA ANALITICA (recorte principal de H2/P3/P6):")
+    log(df["operadora_analitica"].value_counts().to_frame("voos").assign(
+        pct=lambda t: (t["voos"] / len(df) * 100).round(2)).to_string())
+    log("")
+    log("por GRUPO ECONOMICO (analise de sensibilidade):")
+    log(df["grupo_economico"].value_counts().to_frame("voos").assign(
+        pct=lambda t: (t["voos"] / len(df) * 100).round(2)).to_string())
+    log("")
+    log("por SEGMENTO OPERACIONAL (atributo descritivo; decisao D3 PENDENTE --")
+    log("  o segmento NAO filtra nenhuma analise enquanto D3 estiver aberta):")
+    log(df["segmento_operacional"].value_counts().to_frame("voos").assign(
         pct=lambda t: (t["voos"] / len(df) * 100).round(2)).to_string())
 
     # ------------------------------------------------------------------
@@ -307,6 +334,98 @@ def main() -> int:
     log("   YTD homologo; anualizacao e proibida (ver docs/definicao_do_case.md).")
 
     # ------------------------------------------------------------------
+    # R10 — VALIDADE DA CHEGADA (decisao D1)
+    # ------------------------------------------------------------------
+    # Numerada R10 por ser posterior a publicacao de R1-R9. Depende apenas de
+    # R4 (campos derivados) e de R5 (atraso_valido), ambos anteriores.
+    log("\n" + "-" * 74)
+    log("R10 — VALIDADE DA CHEGADA (KPI 7)")
+    log("-" * 74)
+    log("regra aprovada (decisao D1): SIMETRIA COM A PARTIDA")
+    log(f"  [1] chegada_prevista E chegada_real preenchidas")
+    log(f"  [2] |atraso_chegada_min| <= {LIMITE_ATRASO_CHEGADA_MIN} min "
+        f"({LIMITE_ATRASO_CHEGADA_MIN // 60}h) — mesmo limite de R5")
+    log(f"  [3] chegada_real >= partida_real (coerencia cronologica)")
+    log("  atraso_chegada_valido = atraso_valido AND chegada_valida")
+
+    tem_chegada = df["chegada_prevista"].notna() & df["chegada_real"].notna()
+    dentro_chegada = df["atraso_chegada_min"].abs() <= LIMITE_ATRASO_CHEGADA_MIN
+    cronologica = df["chegada_real"] >= df["partida_real"]
+
+    df["chegada_valida"] = tem_chegada & dentro_chegada.fillna(False) & cronologica.fillna(False)
+    df["atraso_chegada_valido"] = df["atraso_valido"] & df["chegada_valida"]
+    # Mesma condicao de atraso_chegada_valido, por construcao: a recuperacao e
+    # a diferenca entre os dois atrasos e exige ambos validos. Nome proprio
+    # mantido para que o consumidor do KPI 7 nao precise saber disso.
+    df["recuperacao_valida"] = df["atraso_chegada_valido"]
+
+    # Motivo unico por registro, na ordem de precedencia de regras.py.
+    motivo = pd.Series(pd.NA, index=df.index, dtype="string")
+    motivo = motivo.mask(df["chegada_prevista"].isna(), "chegada_prevista_ausente")
+    motivo = motivo.mask(motivo.isna() & df["chegada_real"].isna(),
+                         "chegada_real_ausente")
+    motivo = motivo.mask(motivo.isna() & ~cronologica.fillna(False),
+                         "chegada_anterior_a_partida")
+    motivo = motivo.mask(motivo.isna() & ~dentro_chegada.fillna(False),
+                         "atraso_chegada_acima_do_limite")
+    motivo = motivo.mask(motivo.isna() & ~df["atraso_valido"],
+                         "partida_invalida")
+    df["motivo_invalidez_chegada"] = motivo
+
+    log("")
+    log(f"chegada_valida            : {int(df['chegada_valida'].sum()):,}")
+    log(f"atraso_chegada_valido     : {int(df['atraso_chegada_valido'].sum()):,} "
+        f"({df['atraso_chegada_valido'].mean():.2%} do universo)")
+    log(f"  base do KPI 7 (partida E chegada validas)")
+    log("")
+    log("motivos de exclusao do KPI 7 (um motivo por registro, sem sobreposicao):")
+    contagem = df["motivo_invalidez_chegada"].value_counts(dropna=True)
+    log(contagem.to_frame("registros").assign(
+        pct=lambda t: (t["registros"] / len(df) * 100).round(4)).to_string())
+    log(f"total excluido            : {int(contagem.sum()):,}")
+    log(f"conferencia (universo - validos): "
+        f"{len(df) - int(df['atraso_chegada_valido'].sum()):,}")
+    log("-> registros invalidos NAO foram removidos; seguem auditaveis com o")
+    log("   motivo registrado em 'motivo_invalidez_chegada'.")
+
+    # --- impacto sobre o KPI 7 -----------------------------------------
+    log("")
+    log("IMPACTO SOBRE O KPI 7 (recuperacao em voo, em minutos):")
+    cenarios = {
+        "antes de D1 (sem filtro de chegada)": df["recuperacao_min"].notna(),
+        "regra D1 aprovada (24h + cronologia)": df["recuperacao_valida"],
+        f"sensibilidade: corte de {CORTE_SENSIBILIDADE_CHEGADA_H}h":
+            df["atraso_valido"] & tem_chegada & cronologica.fillna(False)
+            & (df["atraso_chegada_min"].abs() <= CORTE_SENSIBILIDADE_CHEGADA_H * 60),
+    }
+    linhas_kpi = []
+    for rotulo, mascara in cenarios.items():
+        s = df.loc[mascara.fillna(False), "recuperacao_min"]
+        linhas_kpi.append({
+            "cenario": rotulo,
+            "n": len(s),
+            "mediana": round(s.median(), 1),
+            "media": round(s.mean(), 3),
+            "soma_h": round(s.sum() / 60),
+            "minimo": round(s.min()),
+            "maximo": round(s.max()),
+        })
+    tab_kpi = pd.DataFrame(linhas_kpi)
+    log(tab_kpi.to_string(index=False))
+    log("")
+    ref = tab_kpi.iloc[0]
+    novo = tab_kpi.iloc[1]
+    sens = tab_kpi.iloc[2]
+    log(f"-> a MEDIANA e imune ao tratamento ({ref['mediana']} -> {novo['mediana']} min):")
+    log("   e por isso que o KPI 7 foi definido como mediana no case.")
+    log(f"-> a MEDIA desloca de {ref['media']} para {novo['media']} min, e o")
+    log(f"   maximo cai de {ref['maximo']:,} para {novo['maximo']:,} min.")
+    log(f"-> o corte de {CORTE_SENSIBILIDADE_CHEGADA_H}h excluiria "
+        f"{int(novo['n']) - int(sens['n']):,} registros a mais e levaria a media")
+    log(f"   a {sens['media']} min. A regra de 24h foi a escolhida por reusar o")
+    log("   limite ja documentado em R5, sem introduzir limiar novo.")
+
+    # ------------------------------------------------------------------
     # FUNIL FINAL
     # ------------------------------------------------------------------
     log("\n" + "=" * 74)
@@ -321,6 +440,8 @@ def main() -> int:
     log(f"registros na base tratada     : {len(df):,}")
     log(f"  com atraso_valido = True    : {int(df['atraso_valido'].sum()):,} "
         f"({df['atraso_valido'].mean():.2%})")
+    log(f"  com atraso_chegada_valido   : {int(df['atraso_chegada_valido'].sum()):,} "
+        f"({df['atraso_chegada_valido'].mean():.2%})")
     log(f"  cancelados                  : {int((df['situacao_voo']=='CANCELADO').sum()):,}")
     log(f"periodo                       : {df['partida_prevista'].min()} a "
         f"{df['partida_prevista'].max()}")
