@@ -15,10 +15,15 @@ Como ler este modulo:
 Historico: extraido de 04_universo.py e 05_bloco_d_concentracao.py na
 auditoria de 2026-08-17, preservando os valores exatos que produziram
 data/processed/voos.parquet e docs/eda_bloco_d.md. A centralizacao NAO
-alterou nenhum resultado -- ver tests/test_regras.py.
+alterou nenhum resultado -- ver tests/test_regras.py. Revisado em
+2026-08-17 (segunda rodada) apos reconciliacao do KPI 7, correcao da
+resolucao de companhia por registro (nao mais por mes) e decisao de
+faixa horaria -- ver secao DECISOES REGISTRADAS ao final.
 """
 
 from __future__ import annotations
+
+import unicodedata
 
 import pandas as pd
 
@@ -89,9 +94,27 @@ LIMITE_ATRASO_CHEGADA_MIN: int = LIMITE_ATRASO_MIN
 # qual a regra de 24h e avaliada.
 CORTE_SENSIBILIDADE_CHEGADA_H: int = 6
 
-# Motivos de invalidez, avaliados NESTA ordem de precedencia. O primeiro que
-# se aplica e o registrado, para que cada voo tenha um motivo unico e o total
-# feche com a contagem de invalidos.
+# Motivos de invalidez, avaliados NESTA ordem de PRECEDENCIA. O primeiro que se
+# aplica e o registrado -- para que cada voo tenha um motivo unico no campo e o
+# total feche com a contagem de invalidos (259.429 = soma dos 5 motivos).
+#
+# ATENCAO -- "motivo unico no campo" NAO significa "o registro tem um unico
+# problema possivel". Reconciliacao de 2026-08-17 (segunda rodada), sobre o
+# universo completo de 5.452.295 registros:
+#   - 259.218 registros (de 259.429 invalidos) tem 2+ motivos tecnicamente
+#     aplicaveis simultaneamente -- so aparece o de maior precedencia;
+#   - exemplo concreto: 510 registros tem AO MESMO TEMPO |atraso_chegada|>24h
+#     E partida invalida (nao-REALIZADO ou outlier de partida). Os 510 sao
+#     rotulados 'atraso_chegada_acima_do_limite', nao 'partida_invalida',
+#     porque essa checagem vem antes na ordem abaixo;
+#   - verificado: 0 divergencias entre o motivo esperado pela ordem de
+#     precedencia e o motivo efetivamente gravado pelo pipeline.
+# Ver docs/status_projeto.md, secao "Reconciliacao do KPI 7" para o funil
+# completo, incluindo a explicacao dos numeros 5.193.012 / 5.193.587 / 145 /
+# 146 / 655 que apareceram em relatorios anteriores -- nenhum e divergencia
+# real; sao definicoes diferentes de denominador ou estagios diferentes do
+# funil (ver docstring de resolve_companhia() para o padrao equivalente
+# aplicado a companhia).
 MOTIVOS_INVALIDEZ_CHEGADA: tuple[str, ...] = (
     "chegada_prevista_ausente",
     "chegada_real_ausente",
@@ -124,7 +147,95 @@ ROTULOS_CATEGORIA: list[str] = [
 ]
 
 # ---------------------------------------------------------------------------
-# R8 — DIMENSAO DE COMPANHIA COM VIGENCIA  (decisao D2, aprovada em 2026-08-17)
+# R11 — FAIXA HORARIA  (decisao de granularidade, aprovada em 2026-08-17)
+# ---------------------------------------------------------------------------
+# 'hora_prevista' (int 0-23, criado em R8) NUNCA e sobrescrita. Duas colunas
+# derivadas, testaveis e ordenadas explicitamente:
+#
+#   faixa_3h     recorte analitico PRINCIPAL (H3, H4, P8, P6, P11) -- 8 faixas
+#                de 3 horas
+#   periodo_dia  agrupamento executivo SECUNDARIO, para comunicacao -- 4 turnos
+#
+# Cada tupla e (rotulo, hora_inicio_inclusive, hora_fim_inclusive).
+FAIXA_3H: tuple[tuple[str, int, int], ...] = (
+    ("00h-03h", 0, 2),
+    ("03h-06h", 3, 5),
+    ("06h-09h", 6, 8),
+    ("09h-12h", 9, 11),
+    ("12h-15h", 12, 14),
+    ("15h-18h", 15, 17),
+    ("18h-21h", 18, 20),
+    ("21h-24h", 21, 23),
+)
+
+PERIODO_DIA: tuple[tuple[str, int, int], ...] = (
+    ("madrugada", 0, 5),
+    ("manha", 6, 11),
+    ("tarde", 12, 17),
+    ("noite", 18, 23),
+)
+
+
+def _bins_e_rotulos(tabela: tuple[tuple[str, int, int], ...]) -> tuple[list[float], list[str]]:
+    """Converte uma tabela (rotulo, ini, fim) em bins/labels para pd.cut."""
+    bins = [tabela[0][1] - 0.5]
+    for _, _, fim in tabela:
+        bins.append(fim + 0.5)
+    rotulos = [rotulo for rotulo, _, _ in tabela]
+    return bins, rotulos
+
+
+def calcular_faixa_3h(horas: pd.Series) -> pd.Series:
+    """
+    Deriva faixa_3h a partir de hora_prevista (0-23). NaN permanece NaN --
+    mesmo tratamento ja aplicado a ano/mes/dia_semana em R8: um voo sem
+    partida_prevista nao pode ser alocado a faixa nenhuma.
+    Categorico ORDENADO: a ordenacao em qualquer tabela ou grafico segue a
+    ordem cronologica do dia, nao a ordem alfabetica do rotulo.
+    """
+    bins, rotulos = _bins_e_rotulos(FAIXA_3H)
+    return pd.cut(horas, bins=bins, labels=rotulos, ordered=True)
+
+
+def calcular_periodo_dia(horas: pd.Series) -> pd.Series:
+    """Deriva periodo_dia a partir de hora_prevista. Ver calcular_faixa_3h."""
+    bins, rotulos = _bins_e_rotulos(PERIODO_DIA)
+    return pd.cut(horas, bins=bins, labels=rotulos, ordered=True)
+
+
+# LIMITACAO REGISTRADA (nao confirmada pela documentacao da ANAC):
+#
+# Nao ha confirmacao documental de que partida_prevista/chegada_prevista sao
+# horario LOCAL de cada aeroporto. Evidencia empirica reunida em 2026-08-17
+# (nao e confirmacao oficial): a duracao PREVISTA (chegada_prevista menos
+# partida_prevista, sem qualquer ajuste de fuso) entre aeroportos de fusos
+# diferentes e SIMETRICA nas duas direcoes e compativel com o tempo real de
+# voo --
+#   SBGR<->SBEG (Brasilia UTC-3 / Manaus UTC-4): ~235 min nas duas direcoes
+#   SBGR<->SBRB (Brasilia UTC-3 / Rio Branco UTC-5): ~240-245 min nas duas
+#
+# Se os horarios fossem locais por aeroporto sem qualquer padronizacao, as
+# duas direcoes divergiriam pelo delta de fuso (p.ex. ~2h entre SBGR e SBRB) --
+# nao e o que se observa. Isso sugere referencia horaria UNICA (provavelmente
+# horario de Brasilia) em vez de hora local por aeroporto, mas o teste e
+# indireto, cobre poucas rotas e NAO substitui confirmacao documental da ANAC.
+#
+# ATE QUE HAJA CONFIRMACAO: qualquer comparacao de faixa_3h/periodo_dia entre
+# aeroportos de fusos diferentes deve citar esta limitacao. A ressalva NAO
+# impede o uso de faixa_3h dentro de um MESMO aeroporto (comparacao intra-
+# aeroporto nao depende de fuso).
+LIMITACAO_FUSO_HORARIO: str = (
+    "Nao confirmado pela ANAC se os horarios sao locais por aeroporto. "
+    "Evidencia empirica (SBGR<->SBEG e SBGR<->SBRB, duracao prevista simetrica "
+    "e compativel com o voo real) sugere referencia horaria unica, mas isso "
+    "e indicio indireto, nao confirmacao documental. Comparar faixa_3h ou "
+    "periodo_dia ENTRE aeroportos de fusos diferentes exige citar esta "
+    "limitacao; comparacao DENTRO do mesmo aeroporto nao e afetada."
+)
+
+# ---------------------------------------------------------------------------
+# R8 — DIMENSAO DE COMPANHIA COM VIGENCIA  (decisao D2, aprovada em 2026-08-17;
+#      resolucao corrigida para NIVEL DE REGISTRO na segunda rodada)
 # ---------------------------------------------------------------------------
 # Um campo NAO pode representar operadora e grupo economico ao mesmo tempo:
 # sao perguntas diferentes e mudam em ritmos diferentes. A dimensao separa:
@@ -136,57 +247,92 @@ ROTULOS_CATEGORIA: list[str] = [
 #   segmento_operacional natureza da operacao (ver nota sobre D3 abaixo)
 #   vigencia_inicio      inclusivo
 #   vigencia_fim         EXCLUSIVO; None = vigente
+#   razoes_sociais       strings de razao social observadas na fonte para esta
+#                        identidade (normalizadas na comparacao). Usadas para
+#                        resolver por REGISTRO em codigos ambiguos -- ver
+#                        resolve_companhia()
 #   base_da_evidencia    de onde vem a afirmacao. Sem isso a dimensao seria
 #                        opiniao disfarcada de dado.
 #
 # REGRA DE OURO: so entra linha aqui com evidencia rastreavel na propria fonte.
 # Codigos sem evidencia caem no residual e sao 'nao_classificado' -- nunca
 # adivinhados.
-DIM_COMPANHIA: tuple[tuple[str, str, str, str, str, str | None, str], ...] = (
+
+
+def _normalizar_texto(s) -> str:
+    """Maiusculas, sem acento, espacos colapsados. '' para nulo/vazio."""
+    if s is None or (isinstance(s, float) and pd.isna(s)):
+        return ""
+    sem_acento = unicodedata.normalize("NFKD", str(s)).encode("ASCII", "ignore").decode("ASCII")
+    return " ".join(sem_acento.upper().split())
+
+
+DIM_COMPANHIA: tuple[tuple[str, str, str, str, str, str | None, tuple[str, ...], str], ...] = (
     # --- as tres grandes: razao social constante em todo o periodo ----------
     ("AZU", "Azul", "Azul", "passageiros", "2019-01-01", None,
-     "razao social constante 'AZUL LINHAS AEREAS BRASILEIRAS S/A' nos 90 arquivos"),
+     ("AZUL LINHAS AEREAS BRASILEIRAS S/A",),
+     "razao social constante 'AZUL LINHAS AEREAS BRASILEIRAS S/A' nos 90 arquivos; "
+     "codigo sem ambiguidade (uma unica identidade em todo o periodo)"),
     ("TAM", "LATAM", "LATAM", "passageiros", "2019-01-01", None,
-     "razao social constante 'TAM LINHAS AEREAS S.A.' nos 90 arquivos"),
+     ("TAM LINHAS AEREAS S.A.",),
+     "razao social constante 'TAM LINHAS AEREAS S.A.' nos 90 arquivos; "
+     "codigo sem ambiguidade"),
     ("GLO", "GOL", "GOL", "passageiros", "2019-01-01", None,
-     "razao social constante 'GOL LINHAS AEREAS S.A.' nos 90 arquivos"),
+     ("GOL LINHAS AEREAS S.A. (EX- VRG LINHAS AEREAS S.A.)",),
+     "razao social constante 'GOL LINHAS AEREAS S.A. (EX- VRG LINHAS AEREAS S.A.)' "
+     "nos 90 arquivos; codigo sem ambiguidade"),
 
     # --- OWT -> ACN: mesma operadora, dois codigos ------------------------
     # Evidencia da vigencia (auditoria 2026-08-17), toda extraida da fonte:
     #   [1] razao social sob OWT muda de 'TWO TAXI AEREO LTDA.' para
-    #       'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)'. Ultimo mes com o
-    #       nome antigo: 2021-06. Primeiro mes com o nome novo: 2021-06.
-    #       Jun/2021 e mes de TRANSICAO: 189 registros com o nome antigo e
-    #       362 com o novo, no MESMO arquivo -- portanto o nome varia por
-    #       registro, nao por publicacao.
-    #   [2] sucessao temporal dos codigos: OWT opera 2019-01 a 2021-11;
+    #       'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)'.
+    #   [2] jun/2021 e mes de TRANSICAO: 189 registros com o nome antigo e
+    #       362 com o novo, no MESMO arquivo mensal -- o nome varia por
+    #       REGISTRO, nao por publicacao. A vigencia mensal isolada (usada na
+    #       primeira implementacao da D2) classificava OS 189 registros de
+    #       nome antigo como Azul Conecta -- erro corrigido nesta rodada:
+    #       resolve_companhia() agora casa a razao social DO PROPRIO REGISTRO
+    #       primeiro, e so recorre a vigencia por data quando a razao social
+    #       esta ausente ou nao reconhecida.
+    #   [3] sucessao temporal dos codigos: OWT opera 2019-01 a 2021-11;
     #       ACN comeca em 2021-11. Sobreposicao de exatamente 1 mes.
-    #   [3] continuidade de malha: 136 aeroportos em comum (de 161 e 218).
-    #   [4] ACN carrega a mesma razao social 'AZUL CONECTA LTDA.' de 2021-11
+    #   [4] continuidade de malha: 136 aeroportos em comum (de 161 e 218).
+    #   [5] ACN carrega a mesma razao social 'AZUL CONECTA LTDA.' de 2021-11
     #       ate 2026-06.
+    # As janelas de vigencia abaixo continuam existindo como FALLBACK -- usadas
+    # apenas quando um registro nao tem razao social reconhecida (ver
+    # resolve_companhia). Nao sao mais a fonte primaria da classificacao.
+    #
     # A frota (100% C208) NAO e usada como justificativa do agrupamento --
     # fica registrada em CARACTERISTICAS_OPERACIONAIS como variavel de
     # controle, conforme a instrucao da decisao D2.
     #
-    # LIMITE DA EVIDENCIA: [1] data a mudanca de NOME NA FONTE, que e um
-    # limite SUPERIOR para o evento societario -- a aquisicao pode ter
+    # LIMITE DA EVIDENCIA: a razao social data a mudanca de NOME NA FONTE, que
+    # e um limite SUPERIOR para o evento societario -- a aquisicao pode ter
     # ocorrido antes de a ANAC atualizar o cadastro. A dimensao afirma a
     # vigencia do nome, nao a data da operacao societaria.
     ("OWT", "Two Taxi Aereo", "Independente", "passageiros_regional",
      "2019-01-01", "2021-06-01",
-     "razao social 'TWO TAXI AEREO LTDA.' na fonte ate 2021-05 (mes cheio)"),
+     ("TWO TAXI AEREO LTDA.",),
+     "razao social 'TWO TAXI AEREO LTDA.' observada no proprio registro; "
+     "janela usada apenas como fallback quando a razao social do registro "
+     "esta ausente"),
     ("OWT", "Azul Conecta", "Azul", "passageiros_regional",
      "2021-06-01", "2021-12-01",
-     "razao social 'AZUL CONECTA LTDA.' na fonte a partir de 2021-06"),
+     ("AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)",),
+     "razao social 'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)' observada no "
+     "proprio registro; janela usada apenas como fallback"),
     ("ACN", "Azul Conecta", "Azul", "passageiros_regional",
      "2021-11-01", None,
-     "razao social 'AZUL CONECTA LTDA.' na fonte em todo o periodo do codigo"),
+     ("AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)",),
+     "razao social 'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)' em todo o "
+     "periodo do codigo; codigo sem ambiguidade de identidade (uma so razao "
+     "social observada sob ACN)"),
 )
 
-# Fronteira de vigencia OWT: jun/2021 e mes MISTO na fonte. A dimensao atribui
-# o mes inteiro a nova identidade (primeira aparicao documentada). A fronteira
-# alternativa (2021-07-01, primeiro mes exclusivamente novo) afetaria 551 voos
-# = 0,010% do universo. A escolha esta declarada para poder ser revista.
+# Registro historico: jun/2021 e o mes onde a vigencia mensal isolada teria
+# classificado errado. Mantido apenas como ancora de evidencia/teste -- NAO e
+# mais usado para decidir classificacao (isso agora e por registro).
 OWT_MES_DE_TRANSICAO: str = "2021-06"
 
 # Valores default para codigo sem linha na dimensao. NAO sao afirmacao sobre a
@@ -211,6 +357,20 @@ CARACTERISTICAS_OPERACIONAIS: dict[str, str] = {
 # Enquanto D3 nao for decidida, o segmento e apenas ATRIBUTO DESCRITIVO: ele
 # nao filtra nenhuma analise. O que D3 decide e se ele passa a ser recorte
 # principal.
+#
+# Auditoria de 'nao_classificado' (2026-08-17, segunda rodada): dos 153.281
+# voos nao_classificado, 113 codigos distintos. Escaneados TODOS por keyword
+# de razao social (mesmo padrao ja usado abaixo: 'CARGO'/'CARGA' ou
+# 'TAXI AEREO'/'AEROTAXI'). 6 codigos adicionais encontrados, 1.312 voos
+# (0,86% do nao_classificado) -- acrescentados as listas abaixo.
+#
+# Os 4 codigos que dominam o restante (PTB Passaredo, PAM MAP, ONE Oceanair/
+# Avianca Brasil, IPM Itapemirim -- juntos 95,28% do nao_classificado) sao
+# companhias aereas de passageiros amplamente documentadas fora da fonte, mas
+# a razao social por si NAO contem um marcador explicito de segmento -- por
+# isso NAO foram classificadas automaticamente. Ficam como SUGESTAO no
+# relatorio de auditoria (docs/status_projeto.md), aguardando validacao, e
+# permanecem 'nao_classificado' ate entao.
 SEGMENTO_CARGA: tuple[str, ...] = (
     "SID",  # SIDERAL LINHAS AEREAS
     "TTL",  # TOTAL LINHAS AEREAS
@@ -221,12 +381,19 @@ SEGMENTO_CARGA: tuple[str, ...] = (
     "TPA",  # TAMPA CARGO
     "LAE",  # LINEA AEREA CARGUEIRA DE COLOMBIA - LANCO
     "LCO",  # LAN CARGO
+    "LYC",  # LYNDEN AIR CARGO, LLC              -- achado na auditoria D3 (2a rodada)
+    "CJT",  # CARGOJET AIRWAYS LTD.              -- idem
+    "MAA",  # AEROTRANSPORTES MAS DE CARGA S.A.  -- idem
+    "UCG",  # UNIWORLD AIR CARGO                 -- idem
+    "BPC",  # BRASPRESS AIR CARGO TRANSPORTES AEREOS LTDA -- idem
 )
 SEGMENTO_TAXI_AEREO: tuple[str, ...] = (
     "ABJ",  # ATA - AEROTAXI ABAETE
     "CQB",  # APUI TAXI AEREO
     "ASO",  # AEROSUL TAXI AEREO
+    "OMI",  # OMNI TAXI AEREO S.A.               -- achado na auditoria D3 (2a rodada)
 )
+
 
 def dim_companhia() -> pd.DataFrame:
     """
@@ -238,10 +405,17 @@ def dim_companhia() -> pd.DataFrame:
     df = pd.DataFrame(list(DIM_COMPANHIA), columns=[
         "codigo_operacional", "operadora_analitica", "grupo_economico",
         "segmento_operacional", "vigencia_inicio", "vigencia_fim",
-        "base_da_evidencia"])
+        "razoes_sociais", "base_da_evidencia"])
     df["vigencia_inicio"] = pd.to_datetime(df["vigencia_inicio"])
     df["vigencia_fim"] = pd.to_datetime(df["vigencia_fim"])
     return df
+
+
+# codigo -> segmento. Construido uma vez: o segmento e atributo do OPERADOR,
+# nao do voo (uma empresa de carga nao vira de passageiros no meio do
+# periodo), entao e identico entre as linhas de vigencia de um mesmo codigo --
+# ver test_segmento_nao_varia_entre_vigencias_do_mesmo_codigo.
+_CODIGO_PARA_SEGMENTO: dict[str, str] = {linha[0]: linha[3] for linha in DIM_COMPANHIA}
 
 
 def _segmento_por_codigo(codigo: str) -> str:
@@ -249,12 +423,11 @@ def _segmento_por_codigo(codigo: str) -> str:
     Segmento operacional de um codigo ICAO.
 
     O segmento e atributo do OPERADOR, nao do voo, e por isso nao depende de
-    vigencia: um operador de carga nao vira de passageiros no meio do periodo.
-    Precedencia: dimensao (quando o codigo esta la) -> listas de D3 -> residual.
+    vigencia nem de razao social do registro. Precedencia: dimensao (quando o
+    codigo esta la) -> listas de D3 -> residual.
     """
-    for linha in DIM_COMPANHIA:
-        if linha[0] == codigo:
-            return linha[3]
+    if codigo in _CODIGO_PARA_SEGMENTO:
+        return _CODIGO_PARA_SEGMENTO[codigo]
     if codigo in SEGMENTO_CARGA:
         return "carga"
     if codigo in SEGMENTO_TAXI_AEREO:
@@ -262,28 +435,56 @@ def _segmento_por_codigo(codigo: str) -> str:
     return SEGMENTO_NAO_CLASSIFICADO
 
 
-def resolve_companhia(codigos: pd.Series, datas: pd.Series) -> pd.DataFrame:
+def resolve_companhia(
+    codigos: pd.Series, datas: pd.Series, razoes_sociais: pd.Series
+) -> pd.DataFrame:
     """
-    Resolve (codigo ICAO, data do voo) -> operadora, grupo economico, segmento.
+    Resolve (codigo ICAO, data do voo, razao social do registro) -> operadora,
+    grupo economico, segmento.
 
     Esta e a UNICA implementacao da consulta a dimensao. Qualquer script que
     precise do agrupamento deve chamar esta funcao, nunca reimplementar a
-    busca por vigencia.
+    busca por vigencia ou por razao social.
 
-    Tratamento de data ausente (partida_prevista nula: 112.623 registros, 2,07%
-    do universo). Nao se pode resolver vigencia sem data, mas descartar a
-    atribuicao seria pior que o comportamento anterior -- um voo da AZU
-    continua sendo da Azul mesmo sem horario programado. Logo:
+    ORDEM DE RESOLUCAO (por registro, nao por mes -- corrigido em 2026-08-17
+    apos achado de que a vigencia mensal isolada classificava errado 189
+    registros de jun/2021, mes de transicao do codigo OWT):
 
-      - codigo com UMA unica linha na dimensao (AZU, TAM, GLO, ACN): a
-        atribuicao e inequivoca e e aplicada mesmo sem data;
-      - codigo com MAIS DE UMA linha (OWT, que troca de grupo em 2021-06):
-        sem data e impossivel saber o lado da fronteira, e o registro cai no
-        residual. Inventar um lado seria afirmar o que o dado nao diz.
+      1. CODIGO SEM AMBIGUIDADE (uma unica linha em DIM_COMPANHIA para aquele
+         codigo, ex.: AZU, TAM, GLO, ACN): atribuicao direta, sem checar razao
+         social nem data. Nao ha ambiguidade a resolver.
+
+      2. CODIGO AMBIGUO (mais de uma linha, ex.: OWT): casa a razao social DO
+         PROPRIO REGISTRO (normalizada) contra as razoes sociais conhecidas de
+         cada linha. Resolve corretamente um mes de transicao, porque decide
+         registro a registro, nunca por agregado mensal.
+
+      3. FALLBACK por data (vigencia): so para registros de codigo ambiguo cuja
+         razao social esta ausente ou nao bate com nenhuma variante conhecida.
+         Usa a data do PROPRIO registro (partida_prevista), nunca uma regra de
+         mes agregado -- por isso nao reintroduz a ambiguidade que a vigencia
+         mensal isolada causava.
+
+      4. RESIDUAL: codigo ambiguo sem razao social reconhecida e sem data (ou
+         com data fora de toda vigencia conhecida) cai em Outros. Inventar uma
+         das duas identidades sem nenhuma evidencia seria pior que admitir que
+         nao ha evidencia.
+
+    Nao ha "data efetiva diaria" disponivel na fonte (item 2 da hierarquia
+    pedida): a unica granularidade sub-mensal que a fonte oferece e a razao
+    social do PROPRIO registro, que e o que o passo 2 usa -- e por isso, na
+    pratica, mais preciso que uma data efetiva diaria seria.
+
+    Tratamento de data ausente (partida_prevista nula: 112.623 registros,
+    2,07% do universo) para codigo SEM AMBIGUIDADE: a atribuicao e aplicada
+    mesmo sem data -- um voo da AZU continua sendo da Azul mesmo sem horario
+    programado.
 
     Devolve um DataFrame alinhado ao index de `codigos`.
     """
     codigos = codigos.astype(str)
+    razoes_norm = razoes_sociais.map(_normalizar_texto)
+
     resultado = pd.DataFrame(
         {
             "operadora_analitica": OPERADORA_RESIDUAL,
@@ -294,20 +495,40 @@ def resolve_companhia(codigos: pd.Series, datas: pd.Series) -> pd.DataFrame:
     )
 
     dim = dim_companhia()
-    linhas_por_codigo = dim["codigo_operacional"].value_counts()
 
-    for linha in dim.itertuples(index=False):
-        alvo = codigos == linha.codigo_operacional
+    for codigo, linhas in dim.groupby("codigo_operacional", sort=False):
+        alvo = codigos == codigo
         if not alvo.any():
             continue
-        dentro = alvo & datas.notna() & (datas >= linha.vigencia_inicio)
-        if pd.notna(linha.vigencia_fim):
-            dentro &= datas < linha.vigencia_fim
-        # Codigo inequivoco: data ausente nao impede a atribuicao.
-        if linhas_por_codigo[linha.codigo_operacional] == 1:
-            dentro |= alvo & datas.isna()
-        resultado.loc[dentro, "operadora_analitica"] = linha.operadora_analitica
-        resultado.loc[dentro, "grupo_economico"] = linha.grupo_economico
+
+        if len(linhas) == 1:
+            # Passo 1 -- codigo sem ambiguidade: atribuicao direta.
+            linha = linhas.iloc[0]
+            resultado.loc[alvo, "operadora_analitica"] = linha["operadora_analitica"]
+            resultado.loc[alvo, "grupo_economico"] = linha["grupo_economico"]
+            continue
+
+        # Passo 2 -- codigo ambiguo: casa pela razao social do proprio registro.
+        resolvido = pd.Series(False, index=resultado.index)
+        for _, linha in linhas.iterrows():
+            variantes = {_normalizar_texto(v) for v in linha["razoes_sociais"]}
+            bate_nome = alvo & razoes_norm.isin(variantes)
+            resultado.loc[bate_nome, "operadora_analitica"] = linha["operadora_analitica"]
+            resultado.loc[bate_nome, "grupo_economico"] = linha["grupo_economico"]
+            resolvido |= bate_nome
+
+        # Passo 3 -- fallback por data, so para quem sobrou (razao social
+        # ausente ou nao reconhecida).
+        restante = alvo & ~resolvido
+        if restante.any():
+            for _, linha in linhas.iterrows():
+                dentro = restante & datas.notna() & (datas >= linha["vigencia_inicio"])
+                if pd.notna(linha["vigencia_fim"]):
+                    dentro &= datas < linha["vigencia_fim"]
+                resultado.loc[dentro, "operadora_analitica"] = linha["operadora_analitica"]
+                resultado.loc[dentro, "grupo_economico"] = linha["grupo_economico"]
+        # Passo 4 -- o que nao bateu em 2 nem em 3 permanece no residual
+        # (ja inicializado no comeco da funcao).
 
     return resultado
 
@@ -321,34 +542,46 @@ def resolve_companhia(codigos: pd.Series, datas: pd.Series) -> pd.DataFrame:
 # divergir -- quando a janela da base avancar, o erro aparece na hora.
 MESES_YTD: int = 6
 
-# Segmentacao da quebra estrutural da pandemia.
+# Regimes de MALHA, derivados EXCLUSIVAMENTE do indice de volume YTD homologo
+# contra 2019. NAO sao periodos epidemiologicos -- sao uma faixa do indicador
+# de volume, e o nome nao deve sugerir outra coisa. Renomeado em 2026-08-17
+# (a versao anterior usava rotulos como "pandemia"/"pos-recuperacao", que
+# atribuiam ao volume uma interpretacao de evento que o dado nao sustenta).
 #
-# ESTA E UMA ESCOLHA METODOLOGICA DECLARADA, nao um achado. O criterio e o
-# indice de volume YTD homologo contra 2019 (medido no universo domestico):
+# Criterio (indice de volume YTD homologo contra 2019, universo domestico):
 #
-#     ano   YTD jan-jun   indice 2019=100
-#     2019      401.034             100,0   <- referencia
-#     2020      223.263              55,7
-#     2021      222.383              55,5
-#     2022      347.763              86,7
-#     2023      397.807              99,2
-#     2024      389.870              97,2
-#     2025      397.871              99,2
-#     2026      396.136              98,8
+#     ano   YTD jan-jun   indice 2019=100    regime
+#     2019      401.034             100,0    malha normalizada (e a referencia)
+#     2020      223.263              55,7    baixa malha
+#     2021      222.383              55,5    baixa malha
+#     2022      347.763              86,7    recuperacao da malha
+#     2023      397.807              99,2    malha normalizada
+#     2024      389.870              97,2    malha normalizada
+#     2025      397.871              99,2    malha normalizada
+#     2026      396.136              98,8    malha normalizada
 #
-# Fronteiras: < 60% = pandemia; 60-95% = recuperacao; >= 95% = pos-recuperacao.
-# Os regimes existem para IMPEDIR comparacao entre periodos heterogeneos. Eles
-# nao explicam nada e nao autorizam afirmacao causal sobre a pandemia.
+# Fronteiras: < 60% = baixa malha; 60-95% = recuperacao da malha;
+# >= 95% = malha normalizada. Por ser um criterio PURO de indice, 2019 (a
+# propria referencia, indice 100) cai em "malha normalizada" junto com
+# 2023-2026 -- NAO ha mais um regime separado para o ano-base. Se o projeto
+# precisar isolar 2019 como marco (p.ex. para comparar "antes/depois" de um
+# evento especifico), isso exige uma classificacao TEMPORAL separada e
+# documentada, distinta desta -- nao criada aqui por nao haver essa
+# necessidade hoje.
+#
+# Os regimes existem para IMPEDIR comparacao entre periodos heterogeneos.
+# Sao rotulo de um indicador OBSERVADO (volume), nao definicao de um evento,
+# e nao autorizam nenhuma leitura causal.
 REGIMES_TEMPORAIS: tuple[tuple[str, int, int, str], ...] = (
-    ("1 pre-pandemia", 2019, 2019, "ano de referencia, indice 100"),
-    ("2 pandemia", 2020, 2021, "volume YTD em 55,7% e 55,5% de 2019"),
-    ("3 recuperacao", 2022, 2022, "volume YTD em 86,7%, ainda abaixo de 2019"),
-    ("4 pos-recuperacao", 2023, 2026, "volume YTD >= 97% de 2019"),
+    ("1 baixa malha", 2020, 2021, "volume YTD em 55,7% e 55,5% de 2019"),
+    ("2 recuperacao da malha", 2022, 2022, "volume YTD em 86,7%, ainda abaixo de 2019"),
+    ("3 malha normalizada", 2019, 2019, "ano de referencia, indice 100 por definicao"),
+    ("3 malha normalizada", 2023, 2026, "volume YTD >= 97% de 2019"),
 )
 
 
 def regime_do_ano(ano: int) -> str:
-    """Regime temporal de um ano. Ver REGIMES_TEMPORAIS."""
+    """Regime de malha de um ano, pelo indice de volume. Ver REGIMES_TEMPORAIS."""
     for nome, inicio, fim, _ in REGIMES_TEMPORAIS:
         if inicio <= ano <= fim:
             return nome
@@ -364,22 +597,9 @@ PERCENTIS_CONCENTRACAO: list[int] = [1, 5, 10, 20, 50]
 # Percentil que define o indicador autoral ICA5.
 PERCENTIL_ICA: int = 5
 
-# Volume minimo para um recorte entrar em tabela de robustez.
-#
-# Motivo: o ICA5 e um share de cauda; em recortes pequenos poucos voos dominam
-# o numerador e o indicador vira ruido. O case exige "volume minimo declarado"
-# (docs/definicao_do_case.md, KPI 2 e KPI 4) -- este e o valor declarado.
-#
-# ESTADO VERIFICADO (auditoria 2026-08-17): o corte e INERTE nos recortes hoje
-# publicados. Menor recorte por ano = 389.066 voos; por grupo de companhia =
-# 304.497. Nenhum recorte e excluido. Centralizar o valor portanto nao alterou
-# nenhum numero. Nao ha analise de sensibilidade deste corte -- pendencia
-# registrada em docs/ROADMAP.md.
-VOLUME_MINIMO_RECORTE: int = 50_000
-
 # Selecao de aeroportos nas tabelas de robustez.
 #
-# ATENCAO: esta e uma regra DIFERENTE de VOLUME_MINIMO_RECORTE, e nao um
+# ATENCAO: esta e uma regra DIFERENTE de VOLUME_MINIMO_COMPANHIA, e nao um
 # sinonimo. O bloco de aeroportos seleciona os N maiores por volume; aplicar o
 # corte de 50.000 traria 22 aeroportos em vez de 12. As duas regras coexistem
 # de proposito e a distincao esta documentada para nao serem confundidas.
@@ -392,6 +612,90 @@ CORTES_SENSIBILIDADE_H: list[int | None] = [6, 12, 24, 48, None]
 # Semente para os modelos nulos de D.7. Fixa para tornar o bloco reproduzivel.
 SEMENTE_ALEATORIA: int = 42
 
+# ---------------------------------------------------------------------------
+# VOLUMES MINIMOS — parametros SEPARADOS POR FINALIDADE (2026-08-17, 2a rodada)
+# ---------------------------------------------------------------------------
+# Ate esta rodada existia um unico corte (VOLUME_MINIMO_RECORTE = 50.000)
+# reaproveitado para qualquer robustez. Isso e um risco: o volume adequado
+# para comparar COMPANHIAS INTEIRAS (populacao de milhoes de voos) nao tem
+# relacao com o volume adequado para uma CELULA aeroporto x faixa horaria
+# (populacao de centenas a milhares). Reusar o mesmo corte nos dois contextos
+# ou super-filtra o segundo ou nao filtra nada de fato no primeiro.
+# Os tres parametros abaixo NUNCA devem ser usados fora da finalidade indicada.
+
+# --- 1) Comparacao de COMPANHIAS (ano, operadora, grupo economico) --------
+#
+# Motivo: o ICA5 e um share de cauda; em recortes pequenos poucos voos dominam
+# o numerador e o indicador vira ruido. O case exige "volume minimo declarado"
+# (docs/definicao_do_case.md, KPI 2 e KPI 4) -- este e o valor declarado.
+#
+# ESTADO VERIFICADO (auditoria 2026-08-17): ANTES da decisao D2 o corte era
+# INERTE (nenhum recorte por ano/grupo era excluido). APOS D2, que separou
+# operadoras pequenas antes escondidas dentro de "Outros", o corte passou a
+# excluir 'Two Taxi Aereo' / 'Independente' (20.235 voos) das tabelas de
+# robustez -- efeito colateral documentado em docs/status_projeto.md.
+VOLUME_MINIMO_COMPANHIA: int = 50_000
+
+# --- 2) Ranking AEROPORTO x FAIXA_3H (celulas de P11) -----------------------
+#
+# Distribuicao medida em 2026-08-17 sobre o universo de calculo (5.193.012
+# voos com atraso_valido), cruzando os 245 aeroportos com atraso_valido pelas
+# 8 faixas de 3h -- 1.221 celulas nao vazias (de um maximo teorico de 1.960):
+#
+#     percentil   voos na celula
+#     min                    1
+#     10%                    3
+#     25%                   30
+#     50%                  250
+#     75%                1.753
+#     90%                9.833
+#     95%               22.678
+#     99%               79.767
+#     max             132.214
+#
+# Sensibilidade do corte (sobre as 1.221 celulas / 5.193.012 voos):
+#
+#     corte >=      0 :  1.221 celulas (100,0%)  cobrindo 100,0% dos voos
+#     corte >=    100 :    749 celulas ( 61,3%)  cobrindo  99,8% dos voos
+#     corte >=    500 :    492 celulas ( 40,3%)  cobrindo  98,5% dos voos
+#     corte >=  1.000 :    382 celulas ( 31,3%)  cobrindo  97,0% dos voos
+#     corte >=  2.000 :    285 celulas ( 23,3%)  cobrindo  94,3% dos voos
+#     corte >=  5.000 :    181 celulas ( 14,8%)  cobrindo  87,7% dos voos
+#     corte >= 10.000 :    120 celulas (  9,8%)  cobrindo  79,3% dos voos
+#
+# Restrito aos 22 aeroportos que ja passam VOLUME_MINIMO_COMPANHIA (174
+# celulas possiveis, min=4, mediana=14.865, max=132.214):
+#
+#     corte >=    500 :  169 de 174 celulas (97,1%)
+#     corte >=  1.000 :  166 de 174 celulas (95,4%)
+#     corte >=  2.000 :  160 de 174 celulas (92,0%)
+#     corte >=  5.000 :  146 de 174 celulas (83,9%)
+#
+# ESCOLHA: 1.000. Margem de erro de uma taxa proxima de 85% com n=1.000 e de
+# aproximadamente +-2,2 pp (IC 95%) -- suficientemente preciso para rankear, e
+# dentro dos 22 grandes aeroportos exclui apenas 8 de 174 celulas (as faixas
+# de madrugada de aeroportos menores). Fora dos 22 grandes, o corte ainda
+# preserva 97,0% do volume total. Valor PROPOSTO com evidencia, nao definido
+# arbitrariamente -- revisitavel se P11 (ainda nao implementado) exigir outro
+# compromisso entre cobertura e precisao.
+VOLUME_MINIMO_AEROPORTO_FAIXA: int = 1_000
+
+# --- 3) Series MENSAIS (ano_mes) ------------------------------------------
+#
+# Distribuicao medida sobre os 90 meses do universo completo (5.452.295
+# voos): minimo 5.716 (2020-04), p5=23.365, mediana=65.247, maximo=78.017.
+# Todo mes tem pelo menos 5.716 voos -- mesmo o mais extremo garante margem de
+# erro pequena para uma proporcao (~+-0,9 pp a 95% para uma taxa perto de
+# 85%). O corte serve para excluir os pontos MAIS extremos de uma serie
+# mensal cruzada com outra dimensao (ex.: mes x operadora), nao para filtrar
+# a serie mensal simples ja publicada em docs/eda_bloco_b.md (que reporta o
+# censo completo dos 90 meses de proposito, sem corte).
+#
+# ESCOLHA: 10.000 -- exclui apenas os 2 meses mais extremos da base
+# (2020-04 e 2020-05, o fundo do poco da baixa malha), preservando 88 de 90
+# meses (97,8%).
+VOLUME_MINIMO_SERIE_MENSAL: int = 10_000
+
 
 # ---------------------------------------------------------------------------
 # DECISOES REGISTRADAS
@@ -401,28 +705,50 @@ SEMENTE_ALEATORIA: int = 42
 #      + coerencia cronologica. KPI 7 usa somente registros com partida E
 #      chegada validas. Invalidos preservados com motivo registrado.
 #      Sensibilidade de 6h mantida (CORTE_SENSIBILIDADE_CHEGADA_H).
-#      Implementada em R10 de 04_universo.py.
+#      Implementada em R10 de 04_universo.py. Reconciliada em 2026-08-17
+#      (2a rodada): todos os numeros de relatorios anteriores (5.193.012,
+#      5.193.587, 145, 146, 655) foram explicados sem alterar a regra --
+#      ver comentario de MOTIVOS_INVALIDEZ_CHEGADA acima e
+#      docs/status_projeto.md.
 #
-# D2 — DIMENSAO DE COMPANHIA .................. APROVADA em 2026-08-17
-#      Operadora e grupo economico passam a ser campos SEPARADOS, com vigencia
+# D2 — DIMENSAO DE COMPANHIA .................. APROVADA em 2026-08-17;
+#                                                RESOLUCAO CORRIGIDA na 2a rodada
+#      Operadora e grupo economico sao campos SEPARADOS, com vigencia
 #      (DIM_COMPANHIA). ACN/OWT: operadora 'Azul Conecta', grupo economico
-#      'Azul', vigencia sustentada pela razao social na fonte.
-#      Em H2/P3/P6: operadora e o recorte PRINCIPAL, grupo economico e a
-#      analise de SENSIBILIDADE. Tipo de aeronave NAO justifica agrupamento --
-#      fica em CARACTERISTICAS_OPERACIONAIS como variavel de controle.
+#      'Azul'. Em H2/P3/P6: operadora e o recorte PRINCIPAL, grupo economico
+#      e a analise de SENSIBILIDADE. Tipo de aeronave NAO justifica
+#      agrupamento -- fica em CARACTERISTICAS_OPERACIONAIS como variavel de
+#      controle.
+#      CORRECAO (2a rodada): a primeira implementacao resolvia por VIGENCIA
+#      MENSAL, o que classificava errado 189 dos 551 registros de jun/2021
+#      (mes de transicao do codigo OWT). resolve_companhia() agora resolve
+#      por RAZAO SOCIAL DO PROPRIO REGISTRO primeiro, com vigencia por data
+#      como fallback -- ver docstring de resolve_companhia().
+#
+# D4 — FAIXA HORARIA .......................... APROVADA em 2026-08-17
+#      faixa_3h (8 faixas de 3h, recorte principal) e periodo_dia (4 turnos,
+#      uso executivo), derivadas de hora_prevista sem sobrescreve-la. Horario
+#      local por aeroporto NAO confirmado pela ANAC -- ver
+#      LIMITACAO_FUSO_HORARIO.
 #
 # ---------------------------------------------------------------------------
 # PENDENCIAS — regras NAO decididas
 # ---------------------------------------------------------------------------
 # D3 — ESCOPO DE OPERADOR ..................... PENDENTE
-#      O universo mistura passageiros (5.352.307), carga (91.722 voos:
-#      SID, TTL, LTG, MWM, CLX, GEC, TPA, LAE, LCO) e taxi aereo (8.266:
-#      ABJ, CQB, ASO) numa analise cuja narrativa de negocio e a experiencia
-#      do passageiro.
+#      O universo mistura passageiros, carga e taxi aereo numa analise cuja
+#      narrativa de negocio e a experiencia do passageiro.
 #      Efeito medido: no ICA5 geral, -0,65 pp (irrelevante). No grupo
-#      "Outros", carga+taxi sao 25,96% e puxam o OTP15. No KPI 6 o efeito e
-#      grande: cancelamento de 2,53% (passageiros), 8,53% (carga) e 18,97%
-#      (taxi aereo).
-#      SEGMENTO_CARGA e SEGMENTO_TAXI_AEREO ja existem como atributo
-#      DESCRITIVO e NAO filtram nada. O que D3 decide e se o segmento passa a
-#      ser recorte principal. Ver docs/status_projeto.md.
+#      "Outros", carga+taxi puxam o OTP15. No KPI 6 o efeito e grande:
+#      cancelamento de ~2% (passageiros) a ~23% (taxi aereo).
+#      Auditoria de 'nao_classificado' (2a rodada, 153.281 voos, 113 codigos):
+#      95,28% concentrados em 4 codigos (PTB Passaredo, PAM MAP, ONE Oceanair/
+#      Avianca Brasil, IPM Itapemirim) -- companhias de passageiros conhecidas
+#      fora da fonte, mas sem marcador de segmento na propria razao social,
+#      por isso NAO classificadas automaticamente. 6 codigos adicionais (1.312
+#      voos) tinham marcador explicito ('CARGO'/'TAXI AEREO') e foram
+#      incorporados a SEGMENTO_CARGA/SEGMENTO_TAXI_AEREO nesta rodada -- essa
+#      extensao usa o MESMO padrao de evidencia ja em vigor, nao e decisao
+#      nova de negocio.
+#      SEGMENTO_CARGA e SEGMENTO_TAXI_AEREO permanecem atributo DESCRITIVO e
+#      NAO filtram nada. O que D3 decide e se o segmento passa a ser recorte
+#      principal. Ver docs/status_projeto.md.

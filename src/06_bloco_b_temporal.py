@@ -3,10 +3,17 @@ BLOCO B — Serie temporal: P1, P2 e KPI 6.
 
 Responde:
   P1     — qual a taxa de pontualidade (OTP15) e como evoluiu entre 2019 e
-           2026, considerando a quebra estrutural da pandemia;
+           2026, considerando a quebra estrutural de VOLUME operado no periodo;
   P2     — que parcela dos voos responde pela maior parte dos minutos de
            atraso, e se essa concentracao mudou ao longo do tempo;
   KPI 6  — taxa de cancelamento.
+
+Nota de nomenclatura (revisada em 2026-08-17, 2a rodada): os REGIMES deste
+bloco (ver regras.REGIMES_TEMPORAIS) sao rotulos de uma faixa do INDICE DE
+VOLUME, nao do evento pandemia de covid-19. Volume e caracteristica
+observada; a pandemia e um evento do mundo real que **coincide** com o
+regime de baixa malha, mas o rotulo nao afirma isso como definicao -- so
+como coincidencia temporal registrada.
 
 Regras nao negociaveis deste bloco (docs/definicao_do_case.md, secao 6):
   - 2026 e PARCIAL (6 meses) e sempre rotulado como tal;
@@ -34,7 +41,7 @@ from regras import (
     MESES_YTD,
     PERCENTIL_ICA,
     REGIMES_TEMPORAIS,
-    VOLUME_MINIMO_RECORTE,
+    VOLUME_MINIMO_COMPANHIA,
     regime_do_ano,
 )
 
@@ -163,20 +170,26 @@ def main() -> int:
     r("fechado aparece aqui APENAS para demonstrar o erro que ele produz.")
 
     # ------------------------------------------------------------------
-    r.sec("B.3 — REGIMES TEMPORAIS (tratamento da pandemia)")
+    r.sec("B.3 — REGIMES DE MALHA (indice de volume, nao periodo epidemiologico)")
     # ------------------------------------------------------------------
-    r("Escolha metodologica DECLARADA, nao achado. Serve para impedir")
-    r("comparacao entre periodos heterogeneos -- nao explica nada e nao")
-    r("autoriza afirmacao causal sobre a pandemia.")
+    r("Escolha metodologica DECLARADA, nao achado. Os rotulos vem EXCLUSIVAMENTE")
+    r("do indice de volume YTD homologo contra 2019 -- nao sao periodos")
+    r("epidemiologicos. Servem para impedir comparacao entre populacoes de")
+    r("tamanho e composicao muito diferentes -- nao explicam nada e nao")
+    r("autorizam nenhuma leitura causal.")
     r("")
     r("criterio: indice de volume YTD homologo contra 2019")
-    r("  < 60%     -> pandemia")
-    r("  60% a 95% -> recuperacao")
-    r("  >= 95%    -> pos-recuperacao")
+    r("  < 60%     -> baixa malha")
+    r("  60% a 95% -> recuperacao da malha")
+    r("  >= 95%    -> malha normalizada")
+    r("")
+    r("NOTA: por ser criterio puro de indice, 2019 (a propria referencia,")
+    r("indice 100) cai em 'malha normalizada' junto com 2023-2026 -- nao ha")
+    r("mais um regime isolado para o ano-base.")
     r("")
     for nome, ini, fim, evid in REGIMES_TEMPORAIS:
         faixa = f"{ini}" if ini == fim else f"{ini}-{fim}"
-        r(f"  {nome:20} {faixa:10} {evid}")
+        r(f"  {nome:24} {faixa:10} {evid}")
 
     base_p = d[d["atraso_valido"]].copy()
     base_p["impacto_min"] = np.clip(base_p["atraso_partida_min"].to_numpy(), 0, None)
@@ -232,10 +245,12 @@ def main() -> int:
     r(f"-> variacao de {t_ytd['OTP15_%'].max() - t_ytd['OTP15_%'].min():.2f} pp "
       f"entre o melhor e o pior ano comparavel.")
     r("")
-    r("NOTA: o OTP15 mais alto ocorre durante a pandemia, quando a malha operava")
-    r("com pouco mais da metade do volume. Isso e ASSOCIACAO entre volume e")
-    r("pontualidade, nao prova de que reduzir voos melhora pontualidade -- o")
-    r("periodo tambem difere em mix de rota, aeroporto, companhia e horario.")
+    r("NOTA: o OTP15 mais alto ocorre no regime de baixa malha (2020-2021),")
+    r("quando a malha operava com pouco mais da metade do volume de 2019. Isso")
+    r("e ASSOCIACAO entre volume e pontualidade, nao prova de que reduzir voos")
+    r("melhora pontualidade -- o periodo tambem difere em mix de rota,")
+    r("aeroporto, companhia e horario, e coincide com a pandemia de covid-19,")
+    r("que alterou demanda e operacao por vias que este bloco nao isola.")
 
     r("")
     r("--- P1.b  Serie anual em ANO FECHADO (2026 excluido: incomparavel) ---")
@@ -308,7 +323,8 @@ def main() -> int:
       f"({t_conc[col_ica].max() - t_conc[col_ica].min():.2f} pp)")
     r("")
     r("RESPOSTA A P2: a concentracao NAO desapareceu em nenhum ano. Ela e")
-    r(f"MAIS ALTA no regime de pandemia e MAIS BAIXA quando a malha opera cheia.")
+    r(f"MAIS ALTA no regime de baixa malha e MAIS BAIXA quando a malha opera")
+    r(f"cheia (regime de malha normalizada).")
     r("Isso e compativel com duas leituras que este bloco NAO separa:")
     r("  (a) malha vazia -> atraso mais episodico -> mais concentrado;")
     r("  (b) malha cheia -> atraso difuso de saturacao -> menos concentrado.")
@@ -334,10 +350,21 @@ def main() -> int:
     r(f"correlacao (Pearson) volume x OTP15     : "
       f"{mc['voos'].corr(mc['otp15']):+.3f}")
     r("")
-    r("-> correlacao NAO e causalidade, e aqui ha confundidor obvio: o volume")
-    r("   caiu por causa da pandemia, que mudou simultaneamente mix de rotas,")
-    r("   perfil de passageiro e operacao aeroportuaria. A correlacao esta")
-    r("   reportada como fato descritivo, nada alem disso.")
+    r("-> correlacao NAO e causalidade. Alem do confundidor obvio -- o volume")
+    r("   caiu no periodo que coincide com a pandemia de covid-19, que mudou")
+    r("   simultaneamente mix de rotas, perfil de passageiro e operacao")
+    r("   aeroportuaria --, uma correlacao mes-a-mes tambem pode refletir:")
+    r("     * TENDENCIA TEMPORAL comum aos dois indicadores (ambos mudam ao")
+    r("       longo dos anos por razoes proprias, nao um por causa do outro);")
+    r("     * AUTOCORRELACAO dentro de cada serie (o volume de um mes se parece")
+    r("       com o do mes anterior, e o mesmo vale para o ICA, o que infla a")
+    r("       correlacao aparente entre elas sem implicar relacao direta);")
+    r("     * SAZONALIDADE compartilhada (meses de alta/baixa demanda podem")
+    r("       coincidir todo ano, criando correlacao sem qualquer mecanismo);")
+    r("     * MUDANCA DE COMPOSICAO da malha entre periodos (rotas, aeroportos")
+    r("       e companhias presentes em 2020-2021 nao sao os mesmos de 2023-2026).")
+    r("   A correlacao esta reportada como fato descritivo, nada alem disso --")
+    r("   nenhuma leitura causal e nenhum mecanismo especifico e afirmado aqui.")
 
     # ------------------------------------------------------------------
     r.sec("B.6 — KPI 6: TAXA DE CANCELAMENTO")
@@ -374,17 +401,17 @@ def main() -> int:
 
     r("")
     r(f"--- KPI6.c  Por operadora analitica (volume minimo "
-      f"{VOLUME_MINIMO_RECORTE:,}) ---")
+      f"{VOLUME_MINIMO_COMPANHIA:,}) ---")
     t_op = base_c.groupby("operadora_analitica").agg(
         voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
     t_op["taxa_cancel_%"] = (t_op["cancelados"]
                              / t_op["voos_programados"] * 100).round(2)
-    excluidas = t_op[t_op["voos_programados"] < VOLUME_MINIMO_RECORTE]
-    t_op = t_op[t_op["voos_programados"] >= VOLUME_MINIMO_RECORTE]
+    excluidas = t_op[t_op["voos_programados"] < VOLUME_MINIMO_COMPANHIA]
+    t_op = t_op[t_op["voos_programados"] >= VOLUME_MINIMO_COMPANHIA]
     r(t_op.sort_values("taxa_cancel_%").to_string())
     if len(excluidas):
         r("")
-        r(f"recortes EXCLUIDOS por volume < {VOLUME_MINIMO_RECORTE:,}: "
+        r(f"recortes EXCLUIDOS por volume < {VOLUME_MINIMO_COMPANHIA:,}: "
           f"{list(excluidas.index)}")
         r("  (o corte deixou de ser inerte apos a decisao D2, que separou")
         r("   operadoras pequenas antes escondidas dentro de 'Outros')")
@@ -440,8 +467,8 @@ def main() -> int:
       f"{t_ytd['OTP15_%'].max():.2f}% entre 2019 e 2026.")
     r(f"  - 2019 (jan-jun): {otp_2019:.2f}%. 2026 (jan-jun): {otp_2026:.2f}%. "
       f"Diferenca de {otp_2026 - otp_2019:+.2f} pp.")
-    r(f"  - O melhor OTP15 ocorre no regime de pandemia, com volume YTD em ~55% "
-      f"de 2019.")
+    r(f"  - O melhor OTP15 ocorre no regime de baixa malha, com volume YTD em "
+      f"~55% de 2019.")
     r(f"  - Taxa de cancelamento em YTD varia de {t_canc['taxa_cancel_%'].min():.2f}% "
       f"a {t_canc['taxa_cancel_%'].max():.2f}%.")
     r(f"  - A concentracao do impacto persiste em TODOS os anos "
@@ -460,16 +487,23 @@ def main() -> int:
     r("")
     r("[3] O QUE CONTINUA SENDO HIPOTESE (nao testado aqui)")
     r("  - Que a queda de volume tenha CAUSADO a melhora do OTP15. O periodo")
-    r("    mudou em muitas outras dimensoes simultaneamente.")
+    r("    mudou em muitas outras dimensoes simultaneamente -- incluindo, mas")
+    r("    nao limitado a, a pandemia de covid-19.")
+    r("  - Que a correlacao volume-concentracao reflita mecanismo causal e nao")
+    r("    tendencia temporal, autocorrelacao serial, sazonalidade compartilhada")
+    r("    ou mudanca de composicao da malha entre periodos (ver B.5.b).")
     r("  - Que exista sazonalidade recorrente (H6, extensao futura). B.4.d")
     r("    descreve o mes medio; nao testa recorrencia entre anos.")
-    r("  - Que a piora do OTP15 na pos-recuperacao venha da saturacao de")
-    r("    infraestrutura. Compativel, nao demonstrado -- exige o Bloco C.")
+    r("  - Que a piora do OTP15 no regime de malha normalizada mais recente")
+    r("    venha da saturacao de infraestrutura. Compativel, nao demonstrado")
+    r("    -- exige o Bloco C.")
     r("")
     r("[4] O QUE NAO PODEMOS CONCLUIR")
     r("  - NAO podemos anualizar 2026 nem projetar o segundo semestre.")
-    r("  - NAO podemos atribuir a pandemia efeito causal sobre pontualidade: o")
-    r("    regime e um rotulo de segmentacao, nao um tratamento experimental.")
+    r("  - NAO podemos atribuir a pandemia de covid-19 (ou a qualquer outro")
+    r("    evento) efeito causal sobre pontualidade a partir deste bloco: o")
+    r("    regime e um rotulo de segmentacao por INDICE DE VOLUME, nao um")
+    r("    tratamento experimental nem uma definicao do evento pandemico.")
     r("  - NAO podemos comparar operadoras aqui: sem controlar aeroporto e")
     r("    faixa horaria, a comparacao mede malha, nao desempenho (isso e o")
     r("    Bloco E, e depende do Bloco C).")

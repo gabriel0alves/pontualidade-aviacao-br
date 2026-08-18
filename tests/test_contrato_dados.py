@@ -46,6 +46,8 @@ COLUNAS_DERIVADAS = [
     # decisao D1 (R10)
     "chegada_valida", "atraso_chegada_valido", "recuperacao_valida",
     "motivo_invalidez_chegada",
+    # decisao D4 (R11)
+    "faixa_3h", "periodo_dia",
 ]
 
 # Valores de referencia, reproduzidos na auditoria de 2026-08-17.
@@ -380,10 +382,10 @@ def test_d2_dimensao_aplicada_bate_com_o_resolvedor(caminho_universo):
     divergir, existe uma segunda implementacao do agrupamento em algum lugar.
     """
     df = pd.read_parquet(caminho_universo, columns=[
-        "sigla_icao_empresa", "partida_prevista", "operadora_analitica",
-        "grupo_economico", "segmento_operacional"])
+        "sigla_icao_empresa", "empresa_aerea", "partida_prevista",
+        "operadora_analitica", "grupo_economico", "segmento_operacional"])
     esperado = regras.resolve_companhia(
-        df["sigla_icao_empresa"], df["partida_prevista"])
+        df["sigla_icao_empresa"], df["partida_prevista"], df["empresa_aerea"])
     for coluna in ("operadora_analitica", "grupo_economico", "segmento_operacional"):
         divergentes = int((df[coluna] != esperado[coluna]).sum())
         assert divergentes == 0, f"{coluna}: {divergentes} registros divergentes"
@@ -438,12 +440,43 @@ def test_d3_segmento_nao_filtra_nada_ainda(caminho_universo):
     """
     Decisao D3 PENDENTE: o segmento e atributo descritivo. Carga e taxi aereo
     devem seguir PRESENTES no universo -- se desaparecerem, alguem aplicou D3
-    sem registrar a decisao.
+    sem registrar a decisao. Valores atualizados em 2026-08-17 (2a rodada):
+    6 codigos com marcador explicito de segmento na razao social (LYC, CJT,
+    MAA, UCG, BPC -> carga; OMI -> taxi_aereo) foram incorporados as listas,
+    movendo 1.312 voos para fora de nao_classificado -- mesmo padrao de
+    evidencia ja em vigor, nao decisao nova.
     """
     df = pd.read_parquet(caminho_universo, columns=["segmento_operacional"])
     contagem = df["segmento_operacional"].value_counts()
-    assert contagem.get("carga", 0) == 91_722
-    assert contagem.get("taxi_aereo", 0) == 8_266
+    assert contagem.get("carga", 0) == 92_385
+    assert contagem.get("taxi_aereo", 0) == 8_915
+    assert contagem.get("nao_classificado", 0) == 151_969
+
+
+def test_d3_extensao_das_listas_usa_o_mesmo_padrao_de_evidencia(caminho_universo):
+    """
+    Guarda de que a extensao de SEGMENTO_CARGA/SEGMENTO_TAXI_AEREO na 2a
+    rodada nao introduziu classificacao por conhecimento externo -- os 6
+    codigos novos devem ter marcador textual ('CARGO'/'CARGA' ou
+    'TAXI AEREO'/'AEROTAXI', apos normalizacao) na propria razao social.
+    """
+    df = pd.read_parquet(caminho_universo,
+                         columns=["sigla_icao_empresa", "empresa_aerea"])
+    df["sigla_icao_empresa"] = df["sigla_icao_empresa"].astype(str)
+    novos_carga = ("LYC", "CJT", "MAA", "UCG", "BPC")
+    novos_taxi = ("OMI",)
+    for codigo in novos_carga:
+        nomes = df.loc[df["sigla_icao_empresa"] == codigo, "empresa_aerea"].unique()
+        assert len(nomes) > 0, f"{codigo} ausente do universo"
+        norm = regras._normalizar_texto(nomes[0])
+        assert "CARGO" in norm or "CARGA" in norm, f"{codigo}: {nomes[0]!r} sem marcador de carga"
+    for codigo in novos_taxi:
+        nomes = df.loc[df["sigla_icao_empresa"] == codigo, "empresa_aerea"].unique()
+        assert len(nomes) > 0, f"{codigo} ausente do universo"
+        norm = regras._normalizar_texto(nomes[0])
+        assert "TAXI AEREO" in norm or "AEROTAXI" in norm, (
+            f"{codigo}: {nomes[0]!r} sem marcador de taxi aereo"
+        )
 
 
 def test_bloco_b_janela_ytd_confere_com_o_dado(caminho_universo):
@@ -494,3 +527,100 @@ def test_ano_parcial_marca_2026(caminho_universo):
     assert bool(por_ano.loc[2026.0]) is True, "2026 deve estar marcado como parcial"
     for ano in (2019.0, 2020.0, 2021.0, 2022.0, 2023.0, 2024.0, 2025.0):
         assert bool(por_ano.loc[ano]) is False, f"{ano:.0f} nao e parcial"
+
+
+# --------------------------------------------------------- R11 faixa horaria
+
+def _series_divergentes(a: pd.Series, b: pd.Series) -> int:
+    """
+    Conta posicoes onde a e b diferem, tratando NaN==NaN como IGUAL.
+
+    Necessario porque comparacao vetorizada do pandas ('!=') sempre devolve
+    True quando qualquer um dos lados e nulo -- inclusive None==None --, o que
+    contaria todo registro sem hora_prevista como divergente mesmo quando os
+    dois lados sao igualmente nulos.
+    """
+    ambos_nulos = a.isna() & b.isna()
+    return int((~ambos_nulos & (a.astype(object) != b.astype(object))).sum())
+
+
+def test_r11_faixa_3h_bate_com_hora_prevista(caminho_universo):
+    """O artefato tem de refletir exatamente regras.calcular_faixa_3h."""
+    df = pd.read_parquet(caminho_universo, columns=["hora_prevista", "faixa_3h"])
+    esperado = regras.calcular_faixa_3h(df["hora_prevista"])
+    divergentes = _series_divergentes(df["faixa_3h"], esperado)
+    assert divergentes == 0, f"{divergentes} registros com faixa_3h divergente"
+
+
+def test_r11_periodo_dia_bate_com_hora_prevista(caminho_universo):
+    df = pd.read_parquet(caminho_universo, columns=["hora_prevista", "periodo_dia"])
+    esperado = regras.calcular_periodo_dia(df["hora_prevista"])
+    divergentes = _series_divergentes(df["periodo_dia"], esperado)
+    assert divergentes == 0, f"{divergentes} registros com periodo_dia divergente"
+
+
+def test_r11_hora_prevista_nao_foi_sobrescrita(caminho_universo):
+    """hora_prevista precisa continuar como estava: inteiro 0-23 (ou nulo)."""
+    df = pd.read_parquet(caminho_universo, columns=["hora_prevista"])
+    presentes = df["hora_prevista"].dropna()
+    assert presentes.min() >= 0 and presentes.max() <= 23
+
+
+def test_r11_faixa_3h_nula_exatamente_onde_hora_prevista_nula(caminho_universo):
+    df = pd.read_parquet(caminho_universo, columns=["hora_prevista", "faixa_3h", "periodo_dia"])
+    assert df["hora_prevista"].isna().equals(df["faixa_3h"].isna())
+    assert df["hora_prevista"].isna().equals(df["periodo_dia"].isna())
+
+
+# --------------------------------------------- reconciliacao do KPI 7 (real)
+
+def test_reconciliacao_kpi7_sobre_dados_reais(caminho_universo):
+    """
+    Reproduz, sobre o artefato real, os numeros do funil documentado em
+    docs/status_projeto.md: 5.193.012 (atraso_valido) / 5.193.587 (antes de
+    corte de outlier de partida) / 145 (chegada extrema entre os validos) /
+    146 (qualquer motivo de chegada entre os validos) / 655 (chegada extrema
+    no universo inteiro). Nenhum e divergencia -- sao definicoes diferentes
+    de denominador, reconciliadas na integra.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "situacao_voo", "partida_prevista", "partida_real",
+        "atraso_partida_min", "atraso_chegada_min", "atraso_valido",
+        "atraso_chegada_valido"])
+
+    realizado = df["situacao_voo"] == "REALIZADO"
+    tem_partida = df["partida_prevista"].notna() & df["partida_real"].notna()
+    antes_d1 = int((realizado & tem_partida).sum())
+    assert antes_d1 == 5_193_587
+
+    assert int(df["atraso_valido"].sum()) == N_ATRASO_VALIDO  # 5.193.012
+    assert antes_d1 - int(df["atraso_valido"].sum()) == 575
+
+    extremos_no_universo = df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN
+    assert int(extremos_no_universo.sum()) == 655
+
+    extremos_e_validos = int((extremos_no_universo & df["atraso_valido"]).sum())
+    assert extremos_e_validos == 145
+
+    falha_chegada_entre_validos = int(
+        (df["atraso_valido"] & ~df["atraso_chegada_valido"]).sum())
+    assert falha_chegada_entre_validos == 146
+    assert falha_chegada_entre_validos - extremos_e_validos == 1  # so a cronologica
+
+    assert int(df["atraso_chegada_valido"].sum()) == N_ATRASO_CHEGADA_VALIDO
+
+
+def test_reconciliacao_precedencia_sobre_dados_reais(caminho_universo):
+    """
+    Confere, sobre o artefato real, que motivo_invalidez_chegada e sempre o
+    motivo de MAIOR precedencia entre os aplicaveis -- reproduzindo o achado
+    de que 510 registros tem |atraso_chegada|>24h E partida invalida ao mesmo
+    tempo, e sao rotulados pelo motivo de chegada, nao pelo de partida.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "atraso_valido", "atraso_chegada_min", "motivo_invalidez_chegada"])
+    duplo_problema = ((df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN)
+                      & ~df["atraso_valido"])
+    assert int(duplo_problema.sum()) == 510
+    assert (df.loc[duplo_problema, "motivo_invalidez_chegada"]
+            == "atraso_chegada_acima_do_limite").all()

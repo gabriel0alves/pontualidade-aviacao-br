@@ -62,29 +62,34 @@ REGRA: toda comparacao anual deste projeto usa a coluna YTD. O ano
 fechado aparece aqui APENAS para demonstrar o erro que ele produz.
 
 ==========================================================================
-B.3 — REGIMES TEMPORAIS (tratamento da pandemia)
+B.3 — REGIMES DE MALHA (indice de volume, nao periodo epidemiologico)
 ==========================================================================
-Escolha metodologica DECLARADA, nao achado. Serve para impedir
-comparacao entre periodos heterogeneos -- nao explica nada e nao
-autoriza afirmacao causal sobre a pandemia.
+Escolha metodologica DECLARADA, nao achado. Os rotulos vem EXCLUSIVAMENTE
+do indice de volume YTD homologo contra 2019 -- nao sao periodos
+epidemiologicos. Servem para impedir comparacao entre populacoes de
+tamanho e composicao muito diferentes -- nao explicam nada e nao
+autorizam nenhuma leitura causal.
 
 criterio: indice de volume YTD homologo contra 2019
-  < 60%     -> pandemia
-  60% a 95% -> recuperacao
-  >= 95%    -> pos-recuperacao
+  < 60%     -> baixa malha
+  60% a 95% -> recuperacao da malha
+  >= 95%    -> malha normalizada
 
-  1 pre-pandemia       2019       ano de referencia, indice 100
-  2 pandemia           2020-2021  volume YTD em 55,7% e 55,5% de 2019
-  3 recuperacao        2022       volume YTD em 86,7%, ainda abaixo de 2019
-  4 pos-recuperacao    2023-2026  volume YTD >= 97% de 2019
+NOTA: por ser criterio puro de indice, 2019 (a propria referencia,
+indice 100) cai em 'malha normalizada' junto com 2023-2026 -- nao ha
+mais um regime isolado para o ano-base.
+
+  1 baixa malha            2020-2021  volume YTD em 55,7% e 55,5% de 2019
+  2 recuperacao da malha   2022       volume YTD em 86,7%, ainda abaixo de 2019
+  3 malha normalizada      2019       ano de referencia, indice 100 por definicao
+  3 malha normalizada      2023-2026  volume YTD >= 97% de 2019
 
 OTP15 por regime (YTD homologo, jan-06, base de pontualidade):
-                      voos  otp15_pct  mediana_min  atraso_30_pct  atraso_60_pct
-regime                                                                          
-1 pre-pandemia      392814      85.79          0.0           7.09           2.71
-2 pandemia          431222      91.09         -3.0           4.34           1.84
-3 recuperacao       336539      89.77         -3.0           4.97           2.03
-4 pos-recuperacao  1539633       85.4         -2.0           7.29           2.87
+                           voos  otp15_pct  mediana_min  atraso_30_pct  atraso_60_pct
+regime                                                                               
+1 baixa malha            431222      91.09         -3.0           4.34           1.84
+2 recuperacao da malha   336539      89.77         -3.0           4.97           2.03
+3 malha normalizada     1932447      85.48         -2.0           7.25           2.83
 
 -> LEITURA PERMITIDA: comparar regimes entre si, cientes de que sao
    populacoes de tamanho e composicao diferentes.
@@ -99,23 +104,25 @@ KPI 1 — OTP15 = % de voos realizados que partem com atraso <= 15 min.
 Base: voos com atraso de partida valido (5,193,012 com data).
 
 --- P1.a  Serie anual em YTD HOMOLOGO (jan-06) ---
-         voos  OTP15_%  atraso>30_%  atraso>60_%  mediana_min  media_min             regime
-2019   392814    85.79         7.09         2.71          0.0       4.34     1 pre-pandemia
-2020   215110     88.9         5.52         2.23         -1.0       2.70         2 pandemia
-2021   216112    93.28         3.18         1.45         -4.0      -0.51         2 pandemia
-2022   336539    89.77         4.97         2.03         -3.0       1.76      3 recuperacao
-2023   384022    85.32         7.14         2.62         -1.0       4.33  4 pos-recuperacao
-2024   377554    85.54         7.26         2.95         -2.0       4.72  4 pos-recuperacao
-2025   388991    86.22         6.93         2.83         -2.0       4.04  4 pos-recuperacao
-2026*  389066    84.53         7.82         3.06         -2.0       4.94  4 pos-recuperacao
+         voos  OTP15_%  atraso>30_%  atraso>60_%  mediana_min  media_min                  regime
+2019   392814    85.79         7.09         2.71          0.0       4.34     3 malha normalizada
+2020   215110     88.9         5.52         2.23         -1.0       2.70           1 baixa malha
+2021   216112    93.28         3.18         1.45         -4.0      -0.51           1 baixa malha
+2022   336539    89.77         4.97         2.03         -3.0       1.76  2 recuperacao da malha
+2023   384022    85.32         7.14         2.62         -1.0       4.33     3 malha normalizada
+2024   377554    85.54         7.26         2.95         -2.0       4.72     3 malha normalizada
+2025   388991    86.22         6.93         2.83         -2.0       4.04     3 malha normalizada
+2026*  389066    84.53         7.82         3.06         -2.0       4.94     3 malha normalizada
 
 amplitude do OTP15 em YTD: 84.53% (2026*) a 93.28% (2021)
 -> variacao de 8.75 pp entre o melhor e o pior ano comparavel.
 
-NOTA: o OTP15 mais alto ocorre durante a pandemia, quando a malha operava
-com pouco mais da metade do volume. Isso e ASSOCIACAO entre volume e
-pontualidade, nao prova de que reduzir voos melhora pontualidade -- o
-periodo tambem difere em mix de rota, aeroporto, companhia e horario.
+NOTA: o OTP15 mais alto ocorre no regime de baixa malha (2020-2021),
+quando a malha operava com pouco mais da metade do volume de 2019. Isso
+e ASSOCIACAO entre volume e pontualidade, nao prova de que reduzir voos
+melhora pontualidade -- o periodo tambem difere em mix de rota,
+aeroporto, companhia e horario, e coincide com a pandemia de covid-19,
+que alterou demanda e operacao por vias que este bloco nao isola.
 
 --- P1.b  Serie anual em ANO FECHADO (2026 excluido: incomparavel) ---
         voos  OTP15_%  atraso>30_%  atraso>60_%  mediana_min  media_min
@@ -254,20 +261,21 @@ Reusa a definicao do Bloco D: impacto = max(atraso_partida_min, 0);
 ICA5 = share do impacto nos 5% de voos com maior atraso.
 
 --- P2.a  ICA5 anual em YTD HOMOLOGO ---
-  ano            regime   voos  impacto_h  ICA5_%  top1_%  top10_%  OTP15_%
- 2019    1 pre-pandemia 392814      50888   57.11   25.24    76.35    85.79
- 2020        2 pandemia 215110      23547   64.60   31.44    82.81    88.90
- 2021        2 pandemia 216112      17506   74.51   43.59    89.23    93.28
- 2022     3 recuperacao 336539      36179   64.02   32.55    81.11    89.77
- 2023 4 pos-recuperacao 384022      54138   53.67   24.80    71.47    85.32
- 2024 4 pos-recuperacao 377554      54501   55.47   24.88    73.08    85.54
- 2025 4 pos-recuperacao 388991      53620   56.79   25.96    74.50    86.22
-2026* 4 pos-recuperacao 389066      58304   53.87   23.97    71.86    84.53
+  ano                 regime   voos  impacto_h  ICA5_%  top1_%  top10_%  OTP15_%
+ 2019    3 malha normalizada 392814      50888   57.11   25.24    76.35    85.79
+ 2020          1 baixa malha 215110      23547   64.60   31.44    82.81    88.90
+ 2021          1 baixa malha 216112      17506   74.51   43.59    89.23    93.28
+ 2022 2 recuperacao da malha 336539      36179   64.02   32.55    81.11    89.77
+ 2023    3 malha normalizada 384022      54138   53.67   24.80    71.47    85.32
+ 2024    3 malha normalizada 377554      54501   55.47   24.88    73.08    85.54
+ 2025    3 malha normalizada 388991      53620   56.79   25.96    74.50    86.22
+2026*    3 malha normalizada 389066      58304   53.87   23.97    71.86    84.53
 
 amplitude do ICA5 em YTD: 53.67% a 74.51% (20.84 pp)
 
 RESPOSTA A P2: a concentracao NAO desapareceu em nenhum ano. Ela e
-MAIS ALTA no regime de pandemia e MAIS BAIXA quando a malha opera cheia.
+MAIS ALTA no regime de baixa malha e MAIS BAIXA quando a malha opera
+cheia (regime de malha normalizada).
 Isso e compativel com duas leituras que este bloco NAO separa:
   (a) malha vazia -> atraso mais episodico -> mais concentrado;
   (b) malha cheia -> atraso difuso de saturacao -> menos concentrado.
@@ -280,10 +288,21 @@ correlacao (Pearson) volume x ICA5 : -0.741
 correlacao (Spearman) volume x ICA5: -0.547
 correlacao (Pearson) volume x OTP15     : -0.613
 
--> correlacao NAO e causalidade, e aqui ha confundidor obvio: o volume
-   caiu por causa da pandemia, que mudou simultaneamente mix de rotas,
-   perfil de passageiro e operacao aeroportuaria. A correlacao esta
-   reportada como fato descritivo, nada alem disso.
+-> correlacao NAO e causalidade. Alem do confundidor obvio -- o volume
+   caiu no periodo que coincide com a pandemia de covid-19, que mudou
+   simultaneamente mix de rotas, perfil de passageiro e operacao
+   aeroportuaria --, uma correlacao mes-a-mes tambem pode refletir:
+     * TENDENCIA TEMPORAL comum aos dois indicadores (ambos mudam ao
+       longo dos anos por razoes proprias, nao um por causa do outro);
+     * AUTOCORRELACAO dentro de cada serie (o volume de um mes se parece
+       com o do mes anterior, e o mesmo vale para o ICA, o que infla a
+       correlacao aparente entre elas sem implicar relacao direta);
+     * SAZONALIDADE compartilhada (meses de alta/baixa demanda podem
+       coincidir todo ano, criando correlacao sem qualquer mecanismo);
+     * MUDANCA DE COMPOSICAO da malha entre periodos (rotas, aeroportos
+       e companhias presentes em 2020-2021 nao sao os mesmos de 2023-2026).
+   A correlacao esta reportada como fato descritivo, nada alem disso --
+   nenhuma leitura causal e nenhum mecanismo especifico e afirmado aqui.
 
 ==========================================================================
 B.6 — KPI 6: TAXA DE CANCELAMENTO
@@ -292,25 +311,24 @@ KPI 6 = CANCELADO / (REALIZADO + CANCELADO).
 'NÃO INFORMADO' (1,307 registros) fica FORA do denominador.
 
 --- KPI6.a  Serie anual em YTD HOMOLOGO (jan-06) ---
-       voos_programados  cancelados  taxa_cancel_%             regime
-2019             401030        8114           2.02     1 pre-pandemia
-2020             223259        8118           3.64         2 pandemia
-2021             222307        6186           2.78         2 pandemia
-2022             347564       10952           3.15      3 recuperacao
-2023             397598       13540           3.41  4 pos-recuperacao
-2024             389870       12305           3.16  4 pos-recuperacao
-2025             397871        8866           2.23  4 pos-recuperacao
-2026*            396136        7056           1.78  4 pos-recuperacao
+       voos_programados  cancelados  taxa_cancel_%                  regime
+2019             401030        8114           2.02     3 malha normalizada
+2020             223259        8118           3.64           1 baixa malha
+2021             222307        6186           2.78           1 baixa malha
+2022             347564       10952           3.15  2 recuperacao da malha
+2023             397598       13540           3.41     3 malha normalizada
+2024             389870       12305           3.16     3 malha normalizada
+2025             397871        8866           2.23     3 malha normalizada
+2026*            396136        7056           1.78     3 malha normalizada
 
 amplitude: 1.78% a 3.64% (1.86 pp)
 
 --- KPI6.b  Por regime ---
-                   voos_programados  cancelados  taxa_cancel_%
-regime                                                        
-1 pre-pandemia               401030        8114           2.02
-2 pandemia                   445566       14304           3.21
-3 recuperacao                347564       10952           3.15
-4 pos-recuperacao           1581475       41767           2.64
+                        voos_programados  cancelados  taxa_cancel_%
+regime                                                             
+1 baixa malha                     445566       14304           3.21
+2 recuperacao da malha            347564       10952           3.15
+3 malha normalizada              1982505       49881           2.52
 
 --- KPI6.c  Por operadora analitica (volume minimo 50,000) ---
                      voos_programados  cancelados  taxa_cancel_%
@@ -319,7 +337,7 @@ LATAM                         1562069       21525           1.38
 GOL                           1460822       25031           1.71
 Azul                          1964991       52579           2.68
 Outros                         231645       22878           9.88
-Azul Conecta                    94799       19002          20.04
+Azul Conecta                    94610       18986          20.07
 
 recortes EXCLUIDOS por volume < 50,000: ['Two Taxi Aereo']
   (o corte deixou de ser inerte apos a decisao D2, que separou
@@ -349,11 +367,11 @@ escolha seja informada em vez de implicita.
 
                       voos_programados  cancelados  taxa_cancel_%     voos  OTP15_pct
 segmento_operacional                                                                 
-carga                            81186        7823           9.64    73216      76.42
-nao_classificado                144277       13641           9.45   130489      77.31
+carga                            81744        7885           9.65    73712      76.53
+nao_classificado                143230       13388           9.35   129695      77.25
 passageiros                    4987882       99135           1.99  4888515      86.36
 passageiros_regional            118838       22765          19.16    96027      83.32
-taxi_aereo                        6182        1414          22.87     4765      83.48
+taxi_aereo                        6671        1605          24.06     5063      82.94
 
 KPI 6 no universo completo        : 2.71%
 KPI 6 somente passageiros         : 2.39%  (diferenca de -0.32 pp)
@@ -370,7 +388,7 @@ B.8 — INTERPRETACAO EM QUATRO NIVEIS
 [1] O QUE OS DADOS MOSTRAM (fato mensurado)
   - OTP15 em YTD homologo varia de 84.53% a 93.28% entre 2019 e 2026.
   - 2019 (jan-jun): 85.79%. 2026 (jan-jun): 84.53%. Diferenca de -1.26 pp.
-  - O melhor OTP15 ocorre no regime de pandemia, com volume YTD em ~55% de 2019.
+  - O melhor OTP15 ocorre no regime de baixa malha, com volume YTD em ~55% de 2019.
   - Taxa de cancelamento em YTD varia de 1.78% a 3.64%.
   - A concentracao do impacto persiste em TODOS os anos (ICA5 de 53.67% a 74.51%).
   - Volume mensal e concentracao correlacionam negativamente (-0.741).
@@ -386,16 +404,23 @@ B.8 — INTERPRETACAO EM QUATRO NIVEIS
 
 [3] O QUE CONTINUA SENDO HIPOTESE (nao testado aqui)
   - Que a queda de volume tenha CAUSADO a melhora do OTP15. O periodo
-    mudou em muitas outras dimensoes simultaneamente.
+    mudou em muitas outras dimensoes simultaneamente -- incluindo, mas
+    nao limitado a, a pandemia de covid-19.
+  - Que a correlacao volume-concentracao reflita mecanismo causal e nao
+    tendencia temporal, autocorrelacao serial, sazonalidade compartilhada
+    ou mudanca de composicao da malha entre periodos (ver B.5.b).
   - Que exista sazonalidade recorrente (H6, extensao futura). B.4.d
     descreve o mes medio; nao testa recorrencia entre anos.
-  - Que a piora do OTP15 na pos-recuperacao venha da saturacao de
-    infraestrutura. Compativel, nao demonstrado -- exige o Bloco C.
+  - Que a piora do OTP15 no regime de malha normalizada mais recente
+    venha da saturacao de infraestrutura. Compativel, nao demonstrado
+    -- exige o Bloco C.
 
 [4] O QUE NAO PODEMOS CONCLUIR
   - NAO podemos anualizar 2026 nem projetar o segundo semestre.
-  - NAO podemos atribuir a pandemia efeito causal sobre pontualidade: o
-    regime e um rotulo de segmentacao, nao um tratamento experimental.
+  - NAO podemos atribuir a pandemia de covid-19 (ou a qualquer outro
+    evento) efeito causal sobre pontualidade a partir deste bloco: o
+    regime e um rotulo de segmentacao por INDICE DE VOLUME, nao um
+    tratamento experimental nem uma definicao do evento pandemico.
   - NAO podemos comparar operadoras aqui: sem controlar aeroporto e
     faixa horaria, a comparacao mede malha, nao desempenho (isso e o
     Bloco E, e depende do Bloco C).

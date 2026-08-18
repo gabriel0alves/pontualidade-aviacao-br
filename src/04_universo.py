@@ -28,11 +28,14 @@ from regras import (
     JANELA_FIM,
     JANELA_INICIO,
     LIMIARES_SEVERIDADE,
+    LIMITACAO_FUSO_HORARIO,
     LIMITE_ATRASO_CHEGADA_MIN,
     LIMITE_ATRASO_MIN,
     LIMITES_CATEGORIA,
     PREFIXOS_ICAO_BR,
     ROTULOS_CATEGORIA,
+    calcular_faixa_3h,
+    calcular_periodo_dia,
     dim_companhia,
     resolve_companhia,
 )
@@ -285,9 +288,14 @@ def main() -> int:
     df["rota"] = (df["icao_origem"].astype(str) + "-" + df["icao_destino"].astype(str))
 
     # Dimensao de companhia COM VIGENCIA (decisao D2). Operadora e grupo
-    # economico sao campos separados, resolvidos por (codigo, data do voo)
-    # atraves de regras.resolve_companhia -- unica implementacao da consulta.
-    resolvido = resolve_companhia(df["sigla_icao_empresa"], df["partida_prevista"])
+    # economico sao campos separados, resolvidos por (codigo, data, razao
+    # social DO PROPRIO REGISTRO) atraves de regras.resolve_companhia --
+    # unica implementacao da consulta. A razao social entra aqui porque em
+    # codigos ambiguos (ex.: OWT) ela resolve corretamente meses de transicao
+    # que uma regra so-por-data classificaria errado -- ver docstring de
+    # resolve_companhia() em regras.py.
+    resolvido = resolve_companhia(
+        df["sigla_icao_empresa"], df["partida_prevista"], df["empresa_aerea"])
     df["operadora_analitica"] = resolvido["operadora_analitica"]
     df["grupo_economico"] = resolvido["grupo_economico"]
     df["segmento_operacional"] = resolvido["segmento_operacional"]
@@ -424,6 +432,30 @@ def main() -> int:
         f"{int(novo['n']) - int(sens['n']):,} registros a mais e levaria a media")
     log(f"   a {sens['media']} min. A regra de 24h foi a escolhida por reusar o")
     log("   limite ja documentado em R5, sem introduzir limiar novo.")
+
+    # ------------------------------------------------------------------
+    # R11 — FAIXA HORARIA (decisao D4)
+    # ------------------------------------------------------------------
+    # hora_prevista (R8) NUNCA e sobrescrita.
+    log("\n" + "-" * 74)
+    log("R11 — FAIXA HORARIA")
+    log("-" * 74)
+    log("faixa_3h    : recorte analitico PRINCIPAL (H3, H4, P8, P6, P11), 8 faixas de 3h")
+    log("periodo_dia : agrupamento executivo SECUNDARIO, 4 turnos")
+    log("ambas derivadas de hora_prevista, categoricas ORDENADAS, sem sobrescrever a original")
+    df["faixa_3h"] = calcular_faixa_3h(df["hora_prevista"])
+    df["periodo_dia"] = calcular_periodo_dia(df["hora_prevista"])
+    log("")
+    log("distribuicao por faixa_3h:")
+    log(df["faixa_3h"].value_counts(sort=False).to_frame("voos").assign(
+        pct=lambda t: (t["voos"] / len(df) * 100).round(2)).to_string())
+    log("")
+    log("distribuicao por periodo_dia:")
+    log(df["periodo_dia"].value_counts(sort=False).to_frame("voos").assign(
+        pct=lambda t: (t["voos"] / len(df) * 100).round(2)).to_string())
+    log("")
+    log("LIMITACAO (nao confirmada pela ANAC):")
+    log(f"  {LIMITACAO_FUSO_HORARIO}")
 
     # ------------------------------------------------------------------
     # FUNIL FINAL

@@ -29,7 +29,7 @@ from regras import (
     PERCENTIS_CONCENTRACAO as PERCENTIS,
     SEMENTE_ALEATORIA,
     TOP_N_AEROPORTOS,
-    VOLUME_MINIMO_RECORTE,
+    VOLUME_MINIMO_COMPANHIA,
 )
 
 BASE = Path(__file__).resolve().parents[1]
@@ -231,7 +231,7 @@ def main() -> int:
     r.sec("D.5 — ROBUSTEZ")
     # ------------------------------------------------------------------
 
-    def bloco_robustez(chave: str, titulo: str, minimo: int = VOLUME_MINIMO_RECORTE):
+    def bloco_robustez(chave: str, titulo: str, minimo: int = VOLUME_MINIMO_COMPANHIA):
         r(f"\n--- {titulo} ---")
         linhas = []
         for k, sub in base.groupby(chave, observed=True):

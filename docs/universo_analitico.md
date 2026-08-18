@@ -113,13 +113,13 @@ criadas: ano, mes, ano_mes, dia_semana, hora_prevista, rota,
          (grupo_companhia mantido como alias de grupo_economico)
 
 --- dimensao de companhia aplicada (D2) ---
-codigo_operacional operadora_analitica grupo_economico segmento_operacional vigencia_inicio vigencia_fim                                                           base_da_evidencia
-               AZU                Azul            Azul          passageiros      2019-01-01          NaT razao social constante 'AZUL LINHAS AEREAS BRASILEIRAS S/A' nos 90 arquivos
-               TAM               LATAM           LATAM          passageiros      2019-01-01          NaT             razao social constante 'TAM LINHAS AEREAS S.A.' nos 90 arquivos
-               GLO                 GOL             GOL          passageiros      2019-01-01          NaT             razao social constante 'GOL LINHAS AEREAS S.A.' nos 90 arquivos
-               OWT      Two Taxi Aereo    Independente passageiros_regional      2019-01-01   2021-06-01        razao social 'TWO TAXI AEREO LTDA.' na fonte ate 2021-05 (mes cheio)
-               OWT        Azul Conecta            Azul passageiros_regional      2021-06-01   2021-12-01              razao social 'AZUL CONECTA LTDA.' na fonte a partir de 2021-06
-               ACN        Azul Conecta            Azul passageiros_regional      2021-11-01          NaT      razao social 'AZUL CONECTA LTDA.' na fonte em todo o periodo do codigo
+codigo_operacional operadora_analitica grupo_economico segmento_operacional vigencia_inicio vigencia_fim                                         razoes_sociais                                                                                                                                                    base_da_evidencia
+               AZU                Azul            Azul          passageiros      2019-01-01          NaT                  (AZUL LINHAS AEREAS BRASILEIRAS S/A,)                         razao social constante 'AZUL LINHAS AEREAS BRASILEIRAS S/A' nos 90 arquivos; codigo sem ambiguidade (uma unica identidade em todo o periodo)
+               TAM               LATAM           LATAM          passageiros      2019-01-01          NaT                              (TAM LINHAS AEREAS S.A.,)                                                                              razao social constante 'TAM LINHAS AEREAS S.A.' nos 90 arquivos; codigo sem ambiguidade
+               GLO                 GOL             GOL          passageiros      2019-01-01          NaT (GOL LINHAS AEREAS S.A. (EX- VRG LINHAS AEREAS S.A.),)                                                 razao social constante 'GOL LINHAS AEREAS S.A. (EX- VRG LINHAS AEREAS S.A.)' nos 90 arquivos; codigo sem ambiguidade
+               OWT      Two Taxi Aereo    Independente passageiros_regional      2019-01-01   2021-06-01                                (TWO TAXI AEREO LTDA.,)                  razao social 'TWO TAXI AEREO LTDA.' observada no proprio registro; janela usada apenas como fallback quando a razao social do registro esta ausente
+               OWT        Azul Conecta            Azul passageiros_regional      2021-06-01   2021-12-01         (AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA),)                                          razao social 'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)' observada no proprio registro; janela usada apenas como fallback
+               ACN        Azul Conecta            Azul passageiros_regional      2021-11-01          NaT         (AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA),) razao social 'AZUL CONECTA LTDA. (EX TWO TAXI AEREO LTDA)' em todo o periodo do codigo; codigo sem ambiguidade de identidade (uma so razao social observada sob ACN)
 
 por OPERADORA ANALITICA (recorte principal de H2/P3/P6):
                         voos    pct
@@ -127,28 +127,28 @@ operadora_analitica
 Azul                 1998164  36.65
 LATAM                1579365  28.97
 GOL                  1489615  27.32
-Outros                254776   4.67
-Azul Conecta          106336   1.95
-Two Taxi Aereo         24039   0.44
+Outros                253269   4.65
+Azul Conecta          106147   1.95
+Two Taxi Aereo         25735   0.47
 
 por GRUPO ECONOMICO (analise de sensibilidade):
                     voos    pct
 grupo_economico                
-Azul             2104500  38.60
+Azul             2104311  38.59
 LATAM            1579365  28.97
 GOL              1489615  27.32
-Outros            254776   4.67
-Independente       24039   0.44
+Outros            253269   4.65
+Independente       25735   0.47
 
 por SEGMENTO OPERACIONAL (atributo descritivo; decisao D3 PENDENTE --
   o segmento NAO filtra nenhuma analise enquanto D3 estiver aberta):
                          voos    pct
 segmento_operacional                
 passageiros           5067144  92.94
-nao_classificado       153281   2.81
+nao_classificado       151969   2.79
 passageiros_regional   131882   2.42
-carga                   91722   1.68
-taxi_aereo               8266   0.15
+carga                   92385   1.69
+taxi_aereo               8915   0.16
 
 --------------------------------------------------------------------------
 R9 — ANOS PARCIAIS
@@ -209,6 +209,36 @@ regra D1 aprovada (24h + cronologia) 5192866     -3.0 -2.613 -226142   -1390    
    a -2.616 min. A regra de 24h foi a escolhida por reusar o
    limite ja documentado em R5, sem introduzir limiar novo.
 
+--------------------------------------------------------------------------
+R11 — FAIXA HORARIA
+--------------------------------------------------------------------------
+faixa_3h    : recorte analitico PRINCIPAL (H3, H4, P8, P6, P11), 8 faixas de 3h
+periodo_dia : agrupamento executivo SECUNDARIO, 4 turnos
+ambas derivadas de hora_prevista, categoricas ORDENADAS, sem sobrescrever a original
+
+distribuicao por faixa_3h:
+            voos    pct
+faixa_3h               
+00h-03h   141800   2.60
+03h-06h   363311   6.66
+06h-09h   864690  15.86
+09h-12h   882123  16.18
+12h-15h   899933  16.51
+15h-18h   881862  16.17
+18h-21h   755503  13.86
+21h-24h   550450  10.10
+
+distribuicao por periodo_dia:
+                voos    pct
+periodo_dia                
+madrugada     505111   9.26
+manha        1746813  32.04
+tarde        1781795  32.68
+noite        1305953  23.95
+
+LIMITACAO (nao confirmada pela ANAC):
+  Nao confirmado pela ANAC se os horarios sao locais por aeroporto. Evidencia empirica (SBGR<->SBEG e SBGR<->SBRB, duracao prevista simetrica e compativel com o voo real) sugere referencia horaria unica, mas isso e indicio indireto, nao confirmacao documental. Comparar faixa_3h ou periodo_dia ENTRE aeroportos de fusos diferentes exige citar esta limitacao; comparacao DENTRO do mesmo aeroporto nao e afetada.
+
 ==========================================================================
 FUNIL DO UNIVERSO ANALITICO
 ==========================================================================
@@ -230,5 +260,5 @@ aeroportos (origem)           : 292
 rotas                         : 3,737
 
 gravado: D:\Projetos\PortifolioAnaliseDeDados\pontualidade-aviacao-br\data\processed\voos.parquet
-tamanho: 159.1 MB
+tamanho: 162.4 MB
 ```

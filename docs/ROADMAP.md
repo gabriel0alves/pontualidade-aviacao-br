@@ -18,16 +18,26 @@ declarado ali é **P1, P2, P3, P6, P8, P11** e **H1–H4**.
 |---|---|---|---|
 | **A** | Universo analítico | — (fundação) | ✅ concluído |
 | **B** | Série temporal | P1, P2, KPI 6 | ✅ concluído |
-| **C** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ⬜ não iniciado |
+| **C** | Aeroporto vs companhia | H2, P3, P6 | ✅ concluído |
 | **D** | Concentração do impacto | H1, P2 | ✅ concluído |
-| **E** | Aeroporto vs companhia | H2, P3, P6 | ⬜ desbloqueado (D2 aprovada) |
-| **F** | Priorização | P11 | ⬜ depende de C e E |
+| **E** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ⬜ não iniciado |
+| **F** | Priorização | P11 | ⬜ prep. de escopo feita; implementação depende de E |
 | **G** | Visualização e dashboard | — (comunicação) | ⬜ depende de B–F |
 
 Blocos **B** e **C** foram definidos nesta auditoria (2026-08-17); antes existia
 apenas a numeração implícita dos scripts. A letra **D** foi mantida como está
 para não invalidar as referências já publicadas em `eda_bloco_d.md` e no case —
 a lacuna B/C é histórica e fica registrada em vez de ser mascarada.
+
+**Troca de letras C↔E (2026-08-17, segunda rodada):** a primeira versão deste
+roadmap chamava "Bloco C" o intradiário e "Bloco E" o aeroporto-vs-companhia.
+Na implementação, o aeroporto-vs-companhia (H2/P3/P6) foi resolvido primeiro —
+por depender apenas de D2, já aprovada — e o script recebeu o nome
+`07_bloco_c_aeroporto_vs_companhia.py` para manter a numeração sequencial dos
+scripts (`04`→A, `05`→D, `06`→B, `07`→este). As letras foram trocadas aqui para
+que o nome do arquivo e a letra do roadmap não divirjam: **C agora é
+aeroporto-vs-companhia (concluído)**, **E agora é dimensões e intradiário (não
+iniciado)**. Nenhum conteúdo analítico mudou — só o rótulo.
 
 ---
 
@@ -50,6 +60,7 @@ Regras R1–R9, cada uma reportando quantos registros afeta:
 | R8 | dimensões derivadas + **dimensão de companhia com vigência** | ano, mês, dia da semana, hora, rota, `operadora_analitica`, `grupo_economico`, `segmento_operacional` |
 | R9 | flag `ano_parcial` | 2026 marcado |
 | **R10** | **validade da chegada** (decisão D1) | 5.192.866 na base do KPI 7; 259.429 excluídos com motivo registrado |
+| **R11** | **`faixa_3h` (8 faixas de 3h) e `periodo_dia` (4 turnos)** a partir de `hora_prevista`, sem sobrescrevê-la (decisão D4) | categóricas ordenadas; nulo só onde `hora_prevista` é nulo; limitação de fuso horário documentada em `LIMITACAO_FUSO_HORARIO` |
 
 **Pendências conhecidas do bloco A:**
 
@@ -57,13 +68,20 @@ Regras R1–R9, cada uma reportando quantos registros afeta:
   porque 112.623 registros sem `partida_prevista` permanecem no universo. As
   chaves de agrupamento aparecem como `2019.0`. Cosmético hoje; virará atrito
   em joins e no Power BI.
-- Não existe `faixa_horaria` — só `hora_prevista`. **P11 depende dela.**
+- ~~Não existe `faixa_horaria` — só `hora_prevista`.~~ **RESOLVIDO por R11**
+  (decisão D4, 2026-08-17): `faixa_3h` e `periodo_dia`. Fica em aberto se
+  `hora_prevista` é hora local do aeroporto ou hora única de referência — não
+  confirmado na documentação da fonte; ver `LIMITACAO_FUSO_HORARIO`.
 - ~~Não existe flag de validade para chegada.~~ **RESOLVIDO por R10** (decisão
   D1, 2026-08-17): `chegada_valida`, `atraso_chegada_valido`,
   `recuperacao_valida` e `motivo_invalidez_chegada`.
 - ~~`grupo_companhia` é mapa por código, sem vigência.~~ **RESOLVIDO por R8**
-  (decisão D2): `operadora_analitica`, `grupo_economico` e
-  `segmento_operacional`, resolvidos por vigência.
+  (decisão D2, corrigida em 2026-08-17): `operadora_analitica`,
+  `grupo_economico` e `segmento_operacional`, resolvidos por registro —
+  vigência mensal é usada apenas como *fallback* quando a razão social do
+  próprio registro não permite desambiguar. A primeira versão (vigência só por
+  mês) classificava errado 189 registros de junho/2021 (OWT); corrigida e
+  travada por teste sobre dados reais.
 
 ---
 
@@ -88,20 +106,64 @@ descreve o mês médio, mas não testa recorrência entre anos.
 
 ---
 
-## Bloco C — Dimensões e intradiário ⬜
+## Bloco C — Aeroporto vs companhia ✅
+
+**Script:** `src/07_bloco_c_aeroporto_vs_companhia.py` · **Saída:**
+`docs/eda_bloco_c.md`
+
+**Responde:** H2 (aeroporto pesa mais que companhia?), P3 (OTP15 por
+companhia nos 12 maiores aeroportos), P6 (Azul × LATAM × GOL no mesmo
+aeroporto e na mesma `faixa_3h`).
+
+Sete seções: universo/escopo (C.1), decomposição de variância em três
+variantes — todos os operadores, Azul/LATAM/GOL por `operadora_analitica`,
+e por `grupo_economico` (C.2), OTP15 por operador nos 12 maiores aeroportos
+(C.3), pivô aeroporto × `faixa_3h` × {Azul, LATAM, GOL} para P6 (C.4),
+características operacionais registradas como controle, não como critério de
+agrupamento (C.5), interpretação em quatro níveis (C.6), preparação de escopo
+para P11 (C.7).
+
+**H2 — resultado depende do escopo, reportado sem escolher um número único:**
+
+| Variante | razão aeroporto/grupo |
+|---|---|
+| Todos os operadores | 0,40 (operadora pesa mais) |
+| Azul/LATAM/GOL por `operadora_analitica` | 1,66 (aeroporto pesa mais) |
+| Azul/LATAM/GOL por `grupo_economico` | 1,97 (aeroporto pesa mais) |
+
+A conclusão troca de sinal segundo o recorte (inclusão ou não do bucket
+heterogêneo "Outros") — reportado como achado, não resolvido por escolha
+silenciosa de um dos três números.
+
+**P6:** células abaixo de 100 voos são sinalizadas, nunca removidas do pivô.
+
+**P11 (preparação, não implementação):** distribuição de volume aeroporto ×
+`faixa_3h` calculada (1.221 células não vazias; 382 elegíveis com n≥1.000) e
+5 critérios de elegibilidade **propostos** em C.7, aguardando decisão do
+usuário antes do Bloco F.
+
+---
+
+## Bloco E — Dimensões e intradiário ⬜
 
 **Responde:** H3 e P8 (curva ao longo do dia), H4 (aeroportos
 desproporcionais), KPI 2, KPI 3, KPI 5.
 
+**Desbloqueado** pela decisão D4 (2026-08-17): `faixa_3h` (8 faixas de 3h) e
+`periodo_dia` (4 turnos) já existem em `regras.py`/no universo — não é mais
+necessário decidir a granularidade.
+
 **Entregar:**
 
-1. Criar `faixa_horaria` em `regras.py` — **decisão de granularidade
-   pendente** (horária, blocos de 3 h, ou madrugada/manhã/tarde/noite).
-2. Taxa de atraso > 15 min e mediana por hora programada de partida (H3/P8).
-3. Share de minutos de atraso **vs** share de voos por aeroporto (H4). Os
+1. Taxa de atraso > 15 min e mediana por `faixa_3h`/`periodo_dia` de partida
+   programada (H3/P8).
+2. Share de minutos de atraso **vs** share de voos por aeroporto (H4). Os
    insumos já estão em D.5; falta o cálculo de desproporcionalidade.
-4. KPI 2 (> 30 e > 60 min), KPI 3 (mediana) e KPI 5 (minutos acumulados) por
-   todas as dimensões, respeitando `VOLUME_MINIMO_RECORTE`.
+3. KPI 2 (> 30 e > 60 min), KPI 3 (mediana) e KPI 5 (minutos acumulados) por
+   todas as dimensões, respeitando o parâmetro de volume mínimo apropriado a
+   cada finalidade (`VOLUME_MINIMO_COMPANHIA`, `VOLUME_MINIMO_SERIE_MENSAL` ou
+   `VOLUME_MINIMO_AEROPORTO_FAIXA` — não reutilizar um pelo outro sem
+   evidência, ver `regras.py`).
 
 **Limite a declarar explicitamente:** um padrão intradiário é compatível com
 efeito cascata **e** com saturação de infraestrutura. As duas explicações não
@@ -122,39 +184,15 @@ H1 confirmada: ICA5 = 56,21%, Gini = 0,8657, robusta em todos os eixos testados.
 
 ---
 
-## Bloco E — Aeroporto vs companhia ⬜
-
-**Responde:** H2, P3, P6 — o coração do diagnóstico e o bloco mais valioso do
-projeto.
-
-**Desbloqueado** pela decisão D2 (2026-08-17): a dimensão de companhia agora
-tem vigência. Em H2/P3/P6, **`operadora_analitica` é o recorte principal** e
-`grupo_economico` é a análise de sensibilidade. `modelo_equipamento` entra como
-**variável de controle**, nunca como critério de agrupamento.
-
-**Ainda depende de:** `faixa_horaria`, do Bloco C, para P6.
-
-**Entregar:**
-
-1. Variância do OTP15 entre companhias **dentro** do mesmo aeroporto vs
-   variância entre aeroportos **dentro** da mesma companhia (H2).
-2. Azul × LATAM × GOL no mesmo aeroporto **e** na mesma faixa horária (P6) —
-   depende de `faixa_horaria` do Bloco C.
-3. Critério de refutação declarado antes de rodar: variâncias equivalentes, ou
-   associação mais forte com a companhia, refutam H2.
-
-**Formulação proibida** até H2 ser testada: "o aeroporto pesa mais que a
-companhia".
-
----
-
 ## Bloco F — Priorização ⬜
 
-**Responde:** P11 — a entrega final. As 10 combinações aeroporto × faixa
-horária com maior potencial de redução de minutos de atraso.
+**Responde:** P11 — a entrega final. As 10 combinações aeroporto × `faixa_3h`
+com maior potencial de redução de minutos de atraso.
 
-**Depende de:** Bloco C (`faixa_horaria`, KPI 5) e Bloco E (para não atribuir a
-um aeroporto o que é atributo do operador).
+**Depende de:** Bloco E (KPI 5 por `faixa_3h`) e da decisão do usuário sobre os
+critérios de elegibilidade propostos em C.7 (Bloco C) — para não atribuir a um
+aeroporto o que é atributo do operador, e para não rankear células com volume
+insuficiente para ser confiável.
 
 **Cuidado registrado em D.8:** não se pode afirmar que atuar sobre a cauda
 reduza o total na mesma proporção. A lista é de **potencial**, sob premissa
@@ -184,7 +222,8 @@ parcial.
 | 2 | `matplotlib` e `duckdb` pinados sem uso | dependência morta |
 | 3 | `ano`/`mes`/`hora_prevista` como `double` | atrito em join e BI |
 | 4 | `voo_domestico` é constante `True` no universo | coluna inútil |
-| 5 | `VOLUME_MINIMO_RECORTE` sem análise de sensibilidade — e **deixou de ser inerte** após D2: exclui agora `Two Taxi Aereo` / `Independente` (20.235 voos) | corte não justificado empiricamente |
+| 5 | ~~`VOLUME_MINIMO_RECORTE` sem análise de sensibilidade~~ **RESOLVIDO (D4, 2026-08-17):** separado em três parâmetros por finalidade — `VOLUME_MINIMO_COMPANHIA` (50.000, comparação de companhia), `VOLUME_MINIMO_SERIE_MENSAL` (10.000, série mensal), `VOLUME_MINIMO_AEROPORTO_FAIXA` (1.000, ranking aeroporto × faixa) — cada um documentado em `regras.py` com distribuição e sensibilidade | resolvido |
 | 6 | `TOP_N_AEROPORTOS = 12` é regra distinta do corte de volume (daria 22 aeroportos) | comparabilidade entre tabelas |
 | 7 | Grafia duplicada `Atraso > 240` / `Atraso >240` em `situacao_partida` | só importa se o campo da fonte for usado |
 | 8 | Domínios de `codigo_di` e `codigo_tipo_linha` — consulta à GEAC/ANAC pendente | segmentação sem semântica |
+| 9 | `hora_prevista`/`faixa_3h` podem não estar no mesmo fuso horário entre aeroportos — não confirmado na documentação da fonte (ver `LIMITACAO_FUSO_HORARIO`) | interpretação de P6/P8/P11 entre regiões |

@@ -4,9 +4,10 @@ Análise diagnóstica da concentração de atrasos na malha aérea doméstica
 brasileira, a partir dos microdados públicos **VRA (Voo Regular Ativo)** da
 ANAC.
 
-> **Status:** Blocos **A** (universo analítico), **B** (série temporal) e **D**
-> (concentração) concluídos e auditados. Diagnóstico central (H2/P3/P6),
-> priorização (P11) e camada de visualização **ainda não implementados** — ver
+> **Status:** Blocos **A** (universo analítico), **B** (série temporal), **C**
+> (aeroporto vs companhia — H2/P3/P6) e **D** (concentração) concluídos e
+> auditados. Bloco E (dimensões e intradiário), priorização (P11) e camada de
+> visualização **ainda não implementados** — ver
 > [`docs/ROADMAP.md`](docs/ROADMAP.md) e
 > [`docs/status_projeto.md`](docs/status_projeto.md).
 
@@ -38,7 +39,7 @@ manutenção nem matrícula da aeronave.
 | **Período** | jan/2019 a jun/2026 (90 arquivos mensais) |
 | **Grão** | 1 linha = 1 etapa de voo de transporte aéreo regular |
 | **Base consolidada** | 6.446.620 registros × 23 colunas |
-| **Universo analítico** | 5.452.295 registros × 48 colunas (doméstico, deduplicado) |
+| **Universo analítico** | 5.452.295 registros × 50 colunas (doméstico, deduplicado) |
 | **Licença dos dados** | dado público da ANAC |
 
 ### ⚠️ 2026 é um ano parcial
@@ -84,9 +85,10 @@ src/
   01_ingest.py                 download idempotente e retomável
   02_consolidar.py             CSV -> Parquet (encoding e schema por arquivo)
   03_auditoria.py              descreve problemas, NÃO corrige nada
-  04_universo.py               Bloco A: regras R1-R10 -> universo analítico
+  04_universo.py               Bloco A: regras R1-R11 -> universo analítico
   05_bloco_d_concentracao.py   Bloco D: concentração, ICA5, robustez
   06_bloco_b_temporal.py       Bloco B: P1, P2, KPI 6, YTD homólogo
+  07_bloco_c_aeroporto_vs_companhia.py   Bloco C: H2, P3, P6
 tests/                         testes das regras críticas (pytest)
 docs/                          documentação metodológica (parte gerada por script)
 notebooks/ powerbi/ sql/ reports/   ainda vazios — ver ROADMAP
@@ -128,16 +130,17 @@ python src/03_auditoria.py                 # -> docs/auditoria_qualidade.md
 python src/04_universo.py                  # -> data/processed/voos.parquet
 python src/05_bloco_d_concentracao.py      # -> docs/eda_bloco_d.md
 python src/06_bloco_b_temporal.py          # -> docs/eda_bloco_b.md
+python src/07_bloco_c_aeroporto_vs_companhia.py   # -> docs/eda_bloco_c.md
 
 # 3. testes
 pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
 
-Os passos 1 e 2 são os únicos custosos (o passo 2 leva ~5 min; o 4, ~35 s). Os
+Os passos 1 e 2 são os únicos custosos (o passo 2 leva ~5 min; o 4, ~40 s). Os
 demais levam segundos porque operam sobre Parquet. O passo 1 pode ser
 interrompido e retomado: arquivos já baixados com tamanho coerente são pulados.
-A suíte de testes roda em ~11 s.
+A suíte de testes (141 testes) roda em ~30 s.
 
 ---
 
@@ -219,10 +222,32 @@ concentração é **−0,741** (Pearson, 90 meses). Correlação, não mecanismo
 
 Dos 9 KPIs definidos em `docs/definicao_do_case.md`, **quatro estão
 implementados**: KPI 1 (OTP15), KPI 4 (ICA5), KPI 6 (cancelamento) e KPI 7
-(recuperação em voo). Os KPIs 2, 3 e 5 estão definidos e aguardam o Bloco C.
+(recuperação em voo). Os KPIs 2, 3 e 5 estão definidos e aguardam o Bloco E.
 
 > **ICA5 é indicador autoral deste projeto.** Não é métrica da ANAC nem padrão
 > de mercado, e deve sempre ser apresentado com a definição visível.
+
+### H2, P3, P6 — aeroporto vs companhia (Bloco C)
+
+**H2 — o aeroporto pesa mais que a companhia? Resultado depende do escopo,**
+reportado sem escolher um número único:
+
+| Variante | razão aeroporto/grupo |
+|---|---|
+| Todos os operadores | 0,40 (operadora pesa mais) |
+| Azul/LATAM/GOL por operadora analítica | 1,66 (aeroporto pesa mais) |
+| Azul/LATAM/GOL por grupo econômico | 1,97 (aeroporto pesa mais) |
+
+A conclusão troca de sinal segundo a inclusão ou não do bucket heterogêneo
+"Outros" — ver `docs/eda_bloco_c.md`, seção C.2, para a decomposição completa.
+
+**P6** (Azul × LATAM × GOL por aeroporto × faixa de 3 h): células com menos de
+100 voos são sinalizadas na tabela, nunca removidas.
+
+**P11 (preparação, não implementação):** distribuição de volume por célula
+aeroporto × faixa calculada e critérios de elegibilidade **propostos**
+(seção C.7 de `eda_bloco_c.md`), aguardando decisão antes de implementar o
+ranking.
 
 ---
 
@@ -241,15 +266,24 @@ implementados**: KPI 1 (OTP15), KPI 4 (ICA5), KPI 6 (cancelamento) e KPI 7
 8. **`codeshare` ausente em 57 dos 90 arquivos** — inviável como série.
 9. **Nenhuma métrica financeira** — o VRA não tem receita, custo nem tarifa.
 10. **A taxa de cancelamento agregada mistura naturezas de operação** —
-    passageiros cancelam 1,99%, carga 9,64% e táxi aéreo 22,87%. A decisão
+    passageiros cancelam 1,99%, carga 9,64% e táxi aéreo 24,06%. A decisão
     sobre tornar passageiros o recorte principal (D3) está **aberta**; até
     então, leia a seção B.7 de `docs/eda_bloco_b.md` antes de citar o KPI 6
     agregado.
-11. **2,81% dos voos têm segmento operacional não classificado** e cancelam a
-    9,45% — a classificação vem da razão social, não de campo oficial da ANAC.
+11. **2,79% dos voos (151.969) têm segmento operacional não classificado.**
+    Auditados por Pareto: 96,11% concentrados em 4 códigos de passageiros
+    conhecidos fora da fonte (PTB/PAM/ONE/IPM), não reclassificados por falta
+    de marcador textual verificável na razão social — ver `status_projeto.md`,
+    seção D3.
 12. **Vigência de companhia é datada pela razão social na fonte**, que é limite
     *superior* do evento societário: a dimensão afirma vigência de nome, não
-    data de aquisição.
+    data de aquisição. Resolvida por **registro** (razão social do próprio
+    voo), não por vigência mensal — a versão mensal misclassificava o mês de
+    transição.
+13. **Horário local por aeroporto não confirmado pela fonte** — `faixa_3h` e
+    `periodo_dia` comparam `hora_prevista` entre aeroportos sem confirmação de
+    que estejam no mesmo fuso horário. Evidência empírica é favorável, não
+    documental. Ver `LIMITACAO_FUSO_HORARIO` em `src/regras.py`.
 
 ---
 
@@ -258,17 +292,19 @@ implementados**: KPI 1 (OTP15), KPI 4 (ICA5), KPI 6 (cancelamento) e KPI 7
 | Etapa | Estado |
 |---|---|
 | Ingestão, consolidação, auditoria de qualidade | ✅ concluído |
-| Bloco A — universo analítico (R1–R10) | ✅ concluído |
+| Bloco A — universo analítico (R1–R11) | ✅ concluído |
 | Bloco D — concentração e ICA5 | ✅ concluído e auditado |
-| **Bloco B — série temporal (P1, P2, KPI 6)** | ✅ **concluído** |
-| Governança (git, README, roadmap, 91 testes) | ✅ concluído |
-| Validade da chegada / KPI 7 (decisão D1) | ✅ implementado |
-| Dimensão de companhia com vigência (decisão D2) | ✅ implementado |
-| Escopo de operador (decisão D3) | ⏳ aguardando decisão |
-| Bloco C — dimensões (H3, H4, P8, KPI 2/3/5) | ⬜ não iniciado |
-| Bloco E — aeroporto vs companhia (H2, P3, P6) | ⬜ desbloqueado, não iniciado |
-| Priorização P11 (Bloco F) | ⬜ não iniciado |
-| Figuras e dashboard (Bloco G) | ⬜ não iniciado |
+| Bloco B — série temporal (P1, P2, KPI 6) | ✅ concluído |
+| **Bloco C — aeroporto vs companhia (H2, P3, P6)** | ✅ **concluído** |
+| Governança (git, README, roadmap, 141 testes) | ✅ concluído |
+| Validade da chegada / KPI 7 (decisão D1) | ✅ implementado e reconciliado |
+| Dimensão de companhia com vigência por registro (decisão D2) | ✅ implementado (corrigido nesta rodada) |
+| Faixa horária `faixa_3h`/`periodo_dia` (decisão D4) | ✅ implementado |
+| Volumes mínimos separados por finalidade (decisão D4.1) | ✅ implementado |
+| Escopo de operador (decisão D3) | ⏳ aguardando decisão (parcialmente auditado) |
+| Bloco E — dimensões e intradiário (H3, H4, P8, KPI 2/3/5) | ⬜ não iniciado |
+| Priorização P11 (Bloco F) | ⬜ escopo preparado; ranking não implementado |
+| Figuras e dashboard (Bloco G) | ⬜ não iniciado (Power BI não iniciado) |
 
 Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -286,3 +322,4 @@ Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | [`docs/universo_analitico.md`](docs/universo_analitico.md) | funil auditável das regras R1–R9 | **gerado** por `04_universo.py` |
 | [`docs/eda_bloco_d.md`](docs/eda_bloco_d.md) | concentração, ICA5, robustez, modelos nulos | **gerado** por `05_bloco_d_concentracao.py` |
 | [`docs/eda_bloco_b.md`](docs/eda_bloco_b.md) | série temporal, OTP15, YTD homólogo, KPI 6 | **gerado** por `06_bloco_b_temporal.py` |
+| [`docs/eda_bloco_c.md`](docs/eda_bloco_c.md) | aeroporto vs companhia, decomposição de variância (H2), P3, P6, preparação de P11 | **gerado** por `07_bloco_c_aeroporto_vs_companhia.py` |

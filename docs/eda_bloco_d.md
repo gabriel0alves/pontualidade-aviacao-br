@@ -155,7 +155,7 @@ D.5 — ROBUSTEZ
 --- POR OPERADORA ANALITICA (recorte principal — D2) ---
 operadora_analitica    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  taxa_atraso15_%
                Azul 1912270           235981    24.7    58.4     77.3 0.877             12.6
-       Azul Conecta   75792            17092    21.2    57.3     77.8 0.877             18.1
+       Azul Conecta   75619            17082    21.2    57.2     77.8 0.877             18.2
                 GOL 1435704           210500    25.6    53.2     70.8 0.850             15.5
               LATAM 1540541           171662    20.8    50.6     70.1 0.848             13.1
              Outros  208470            71984    27.1    60.0     76.9 0.872             22.9
@@ -164,7 +164,7 @@ operadora_analitica    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  tax
 
 --- POR GRUPO ECONOMICO (sensibilidade — D2) ---
 grupo_economico    voos  impacto_total_h  top1_%  ICA5_%  top10_%  gini  taxa_atraso15_%
-           Azul 1988062           253074    24.8    58.8     77.5 0.878             12.9
+           Azul 1987889           253064    24.8    58.8     77.5 0.878             12.9
             GOL 1435704           210500    25.6    53.2     70.8 0.850             15.5
           LATAM 1540541           171662    20.8    50.6     70.1 0.848             13.1
          Outros  208470            71984    27.1    60.0     76.9 0.872             22.9
