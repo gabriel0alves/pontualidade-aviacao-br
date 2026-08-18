@@ -406,6 +406,20 @@ def test_volumes_minimos_sao_parametros_separados_por_finalidade():
             < regras.VOLUME_MINIMO_COMPANHIA)
 
 
+def test_p11_tem_corte_de_celula_proprio_da_janela_de_12_meses():
+    """
+    D5: o corte de celula do ranking operacional (P11) NAO pode reusar
+    VOLUME_MINIMO_AEROPORTO_FAIXA -- esse foi estudado sobre 2019-2026
+    (historico completo), e o P11 usa uma janela ~7,5x mais curta (12 meses).
+    Reaproveitar o mesmo numero absoluto sub-cobriria a janela sem aviso.
+    """
+    assert regras.VOLUME_MINIMO_CELULA_P11 == 500
+    assert regras.VOLUME_MINIMO_CELULA_P11 != regras.VOLUME_MINIMO_AEROPORTO_FAIXA
+    assert regras.HORIZONTE_P11_INICIO == "2025-07"
+    assert regras.HORIZONTE_P11_FIM == "2026-06"
+    assert regras.MESES_HORIZONTE_P11 == 12
+
+
 def test_d1_limite_da_chegada_e_simetrico_ao_da_partida():
     """
     Decisao D1 aprovada: SIMETRIA. O limite da chegada e o MESMO da partida, de
@@ -609,13 +623,14 @@ def test_reconciliacao_funil_do_kpi7_com_dados_sinteticos():
     tem_chegada = linhas["chegada_prevista"].notna() & linhas["chegada_real"].notna()
     atraso_chegada = (linhas["chegada_real"] - linhas["chegada_prevista"]).dt.total_seconds() / 60
     cronologica = linhas["chegada_real"] >= linhas["partida_real"]
-    chegada_valida = (tem_chegada & (atraso_chegada.abs() <= regras.LIMITE_ATRASO_CHEGADA_MIN).fillna(False)
-                      & cronologica.fillna(False))
-    atraso_chegada_valido = atraso_valido & chegada_valida
+    chegada_individualmente_valida = (
+        tem_chegada & (atraso_chegada.abs() <= regras.LIMITE_ATRASO_CHEGADA_MIN).fillna(False)
+        & cronologica.fillna(False))
+    atraso_chegada_valido = atraso_valido & chegada_individualmente_valida
 
     # estagio [D]: atraso_chegada_valido -- exclui o caso de chegada extrema,
-    # mesmo esse caso tendo atraso_valido=True (o padrao "145" do relatorio
-    # anterior: valido na partida, invalido na chegada).
+    # mesmo esse caso tendo atraso_valido=True (padrao dos 146 registros reais
+    # de docs/status_projeto.md: validos na partida, invalidos na chegada).
     assert int(atraso_chegada_valido.sum()) == 1
     extremos_com_partida_valida = int((atraso_valido & (atraso_chegada.abs() > regras.LIMITE_ATRASO_CHEGADA_MIN)).sum())
     assert extremos_com_partida_valida == 1
@@ -625,7 +640,7 @@ def test_reconciliacao_motivo_unico_nao_implica_problema_unico():
     """
     Guarda do achado de precedencia (2a rodada): um registro pode ter 2+
     motivos de invalidez APLICAVEIS simultaneamente, mas o campo
-    motivo_invalidez_chegada grava so o de MAIOR precedencia. Constroi um caso
+    motivo_principal_invalidez_chegada grava so o de MAIOR precedencia. Constroi um caso
     sintetico com chegada extrema E partida invalida ao mesmo tempo (o padrao
     real que atinge 510 registros na base completa) e confere que o motivo
     registrado e o de chegada, nao o de partida.

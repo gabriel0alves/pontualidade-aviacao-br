@@ -172,28 +172,41 @@ anos marcados como PARCIAIS: [2026.0]
 --------------------------------------------------------------------------
 R10 — VALIDADE DA CHEGADA (KPI 7)
 --------------------------------------------------------------------------
-regra aprovada (decisao D1): SIMETRIA COM A PARTIDA
-  [1] chegada_prevista E chegada_real preenchidas
-  [2] |atraso_chegada_min| <= 1440 min (24h) — mesmo limite de R5
-  [3] chegada_real >= partida_real (coerencia cronologica)
-  atraso_chegada_valido = atraso_valido AND chegada_valida
+regra aprovada (decisao D1): SIMETRIA COM A PARTIDA. Tres conceitos
+distintos, nao intercambiaveis:
+  DISPONIBILIDADE     : chegada_prevista E chegada_real preenchidas
+  VALIDADE INDIVIDUAL : disponivel E dentro do limite E cronologica
+  ELEGIBILIDADE KPI 7 : atraso_valido (partida) E validade individual
 
-chegada_valida            : 5,192,931
-atraso_chegada_valido     : 5,192,866 (95.24% do universo)
-  base do KPI 7 (partida E chegada validas)
+chegada_disponivel               : 5,193,587
+chegada_individualmente_valida   : 5,192,931
+atraso_chegada_valido            : 5,192,866 (95.24% do universo)
+  base do KPI 7 (elegibilidade completa: partida E chegada validas)
 
-motivos de exclusao do KPI 7 (um motivo por registro, sem sobreposicao):
-                                registros     pct
-motivo_invalidez_chegada                         
-chegada_real_ausente               146085  2.6793
-chegada_prevista_ausente           112623  2.0656
-atraso_chegada_acima_do_limite        655   0.012
-partida_invalida                       65  0.0012
-chegada_anterior_a_partida              1     0.0
+motivo PRINCIPAL de exclusao do KPI 7 (1 por registro, por precedencia):
+                                    registros     pct
+motivo_principal_invalidez_chegada                   
+chegada_real_ausente                   146085  2.6793
+chegada_prevista_ausente               112623  2.0656
+atraso_chegada_acima_do_limite            655   0.012
+partida_invalida                           65  0.0012
+chegada_anterior_a_partida                  1     0.0
 total excluido            : 259,429
 conferencia (universo - validos): 259,429
--> registros invalidos NAO foram removidos; seguem auditaveis com o
-   motivo registrado em 'motivo_invalidez_chegada'.
+
+QUANTIDADE DE MOTIVOS APLICAVEIS por registro (independe de precedencia):
+                               registros
+qtd_motivos_invalidez_chegada           
+0                                5192866
+1                                    211
+2                                 259216
+3                                      2
+-> 259,218 registros tem 2 OU MAIS problemas aplicaveis simultaneamente; o motivo principal mostra so o de maior
+   precedencia. Exemplo: 510 registros tem, ao mesmo tempo, atraso de chegada acima do limite E partida
+   invalida -- rotulados 'atraso_chegada_acima_do_limite' porque essa checagem
+   vem antes na ordem de precedencia, nao porque a partida esteja correta.
+-> registros invalidos NAO foram removidos; seguem auditaveis pelas 5 flags
+   'problema_*', pelo motivo principal e pela contagem de motivos aplicaveis.
 
 IMPACTO SOBRE O KPI 7 (recuperacao em voo, em minutos):
                              cenario       n  mediana  media  soma_h  minimo  maximo
@@ -260,5 +273,5 @@ aeroportos (origem)           : 292
 rotas                         : 3,737
 
 gravado: D:\Projetos\PortifolioAnaliseDeDados\pontualidade-aviacao-br\data\processed\voos.parquet
-tamanho: 162.4 MB
+tamanho: 163.7 MB
 ```

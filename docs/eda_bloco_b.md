@@ -305,32 +305,73 @@ correlacao (Pearson) volume x OTP15     : -0.613
    nenhuma leitura causal e nenhum mecanismo especifico e afirmado aqui.
 
 ==========================================================================
-B.6 — KPI 6: TAXA DE CANCELAMENTO
+B.6 — KPI 6: TAXA DE CANCELAMENTO (decisao D3 APROVADA)
 ==========================================================================
-KPI 6 = CANCELADO / (REALIZADO + CANCELADO).
-'NÃO INFORMADO' (1,307 registros) fica FORA do denominador.
+HEADLINE (decisao D3, aprovada): taxa de cancelamento das operacoes
+domesticas regulares de PASSAGEIROS com segmento validado --
+segmento_operacional em {'passageiros', 'passageiros_regional'}.
 
---- KPI6.a  Serie anual em YTD HOMOLOGO (jan-06) ---
-       voos_programados  cancelados  taxa_cancel_%                  regime
-2019             401030        8114           2.02     3 malha normalizada
-2020             223259        8118           3.64           1 baixa malha
-2021             222307        6186           2.78           1 baixa malha
-2022             347564       10952           3.15  2 recuperacao da malha
-2023             397598       13540           3.41     3 malha normalizada
-2024             389870       12305           3.16     3 malha normalizada
-2025             397871        8866           2.23     3 malha normalizada
-2026*            396136        7056           1.78     3 malha normalizada
+NENHUM registro foi removido da base. Carga, taxi aereo e nao
+classificado continuam no parquet e sao reportados abaixo, separados,
+nunca presumidos como passageiros nem como carga.
 
-amplitude: 1.78% a 3.64% (1.86 pp)
+Regra para 'NAO INFORMADO' (situacao_voo), valida para TODAS as visoes
+desta secao: fica FORA do denominador do KPI 6 em qualquer recorte.
+Motivo: sem desfecho declarado nao se pode afirmar nem cancelamento nem
+realizacao. 1,307 registros (0.0240% do universo)
+excluidos por essa regra -- documentados, nao descartados.
 
---- KPI6.b  Por regime ---
-                        voos_programados  cancelados  taxa_cancel_%
-regime                                                             
-1 baixa malha                     445566       14304           3.21
-2 recuperacao da malha            347564       10952           3.15
-3 malha normalizada              1982505       49881           2.52
+--- KPI6.0  As 4 visoes exigidas (universo completo, nao YTD) ---
+                                    numerador_cancelados  denominador_programados  taxa_cancel_%  cobertura_do_universo_%
+visao                                                                                                                    
+[HEADLINE] passageiros                            121900                  5106720           2.39                    95.66
+carga + taxi aereo                                  9490                    88415          10.73                     1.66
+nao classificado                                   13388                   143230           9.35                     2.68
+todos os segmentos (sensibilidade)                144778                  5338365           2.71                   100.00
 
---- KPI6.c  Por operadora analitica (volume minimo 50,000) ---
+nao classificados: 143,230 registros (2.68% do denominador REALIZADO+CANCELADO)
+-> ficam FORA do headline e fora de 'carga + taxi aereo' -- so aparecem
+   em 'todos os segmentos', que existe UNICAMENTE como sensibilidade.
+   Nenhuma classificacao foi presumida para eles (ver D3 em
+   docs/status_projeto.md).
+
+--- KPI6.a  Serie anual do HEADLINE em YTD HOMOLOGO (jan-06) ---
+       numerador_cancelados  denominador_programados  taxa_cancel_%  cobertura_classificacao_%  nao_classificados_n  nao_classificados_%                  regime
+2019                   6753                   362479           1.86                      90.39                34686                 8.65     3 malha normalizada
+2020                   6781                   211529           3.21                      94.75                 6936                 3.11           1 baixa malha
+2021                   4858                   208539           2.33                      93.81                 6919                 3.11           1 baixa malha
+2022                   9187                   330880           2.78                      95.20                 9358                 2.69  2 recuperacao da malha
+2023                  11731                   381296           3.08                      95.90                 9454                 2.38     3 malha normalizada
+2024                  10034                   370962           2.70                      95.15                11884                 3.05     3 malha normalizada
+2025                   7291                   388722           1.88                      97.70                 3235                 0.81     3 malha normalizada
+2026*                  6455                   391595           1.65                      98.85                  423                 0.11     3 malha normalizada
+
+amplitude (headline passageiros): 1.65% a 3.21% (1.56 pp)
+'cobertura_classificacao_%' = share do denominador total (REALIZADO+
+CANCELADO daquele ano) que e passageiros -- o complemento inclui carga,
+taxi aereo E nao classificado. 'NAO INFORMADO' ja fora do denominador.
+
+--- KPI6.b  HEADLINE por regime ---
+                        numerador_cancelados  denominador_programados  taxa_cancel_%  cobertura_classificacao_%
+regime                                                                                                         
+1 baixa malha                          11639                   420068           2.77                      94.28
+2 recuperacao da malha                  9187                   330880           2.78                      95.20
+3 malha normalizada                    42264                  1895054           2.23                      95.59
+
+--- KPI6.c  HEADLINE por operadora analitica (volume minimo 50,000 de voos de passageiros) ---
+                     numerador_cancelados  denominador_programados  taxa_cancel_%
+operadora_analitica                                                              
+LATAM                               21525                  1562069           1.38
+GOL                                 25031                  1460822           1.71
+Azul                                52579                  1964991           2.68
+Azul Conecta                        18986                    94610          20.07
+
+operadoras de PASSAGEIROS excluidas por volume < 50,000: ['Two Taxi Aereo']
+  (operadoras cujo volume de passageiros e pequeno, mesmo que o volume
+   TOTAL da operadora -- incluindo carga/taxi aereo -- seja maior)
+
+Sensibilidade -- mesma tabela em 'todos os segmentos' (nao apenas
+passageiros), para comparacao direta:
                      voos_programados  cancelados  taxa_cancel_%
 operadora_analitica                                             
 LATAM                         1562069       21525           1.38
@@ -339,31 +380,26 @@ Azul                          1964991       52579           2.68
 Outros                         231645       22878           9.88
 Azul Conecta                    94610       18986          20.07
 
-recortes EXCLUIDOS por volume < 50,000: ['Two Taxi Aereo']
-  (o corte deixou de ser inerte apos a decisao D2, que separou
-   operadoras pequenas antes escondidas dentro de 'Outros')
-
---- KPI6.d  Piores meses de cancelamento ---
-         voos_programados  cancelados  taxa_%
-ano_mes                                      
-2020-04              5716         754   13.19
-2020-05              7287         700    9.61
-2020-06             10324         720    6.97
-2020-03             54131        3380    6.24
-2020-07             17102         898    5.25
-2023-10             67023        3396    5.07
-2022-11             64397        2783    4.32
-2022-06             58773        2460    4.19
-2023-06             65707        2685    4.09
-2022-01             62974        2553    4.05
+--- KPI6.d  Piores meses de cancelamento (HEADLINE) ---
+         numerador_cancelados  denominador_programados  taxa_%
+ano_mes                                                       
+2020-04                   543                     4775   11.37
+2020-05                   641                     6289   10.19
+2020-06                   645                     9383    6.87
+2020-03                  2859                    51070    5.60
+2023-10                  3060                    63991    4.78
+2020-07                   746                    15850    4.71
+2022-11                  2509                    62043    4.04
+2022-06                  2200                    56149    3.92
+2024-11                  2465                    63250    3.90
+2021-03                  1229                    32933    3.73
 
 ==========================================================================
-B.7 — SENSIBILIDADE: SEGMENTO OPERACIONAL (decisao D3 PENDENTE)
+B.7 — SEGMENTO OPERACIONAL: DETALHE E SENSIBILIDADE (D3 APROVADA)
 ==========================================================================
-A decisao D3 (se passageiros deve ser o recorte principal) esta ABERTA.
-Enquanto isso, as series acima cobrem o universo COMPLETO -- comportamento
-atual, sem regra nova. Esta secao mostra o que mudaria, para que a
-escolha seja informada em vez de implicita.
+D3 decidiu o HEADLINE (B.6); esta secao detalha os segmentos que ficam
+fora dele e reune a comparacao de OTP15, que a decisao D3 nao altera
+(D3 e sobre o KPI 6 -- OTP15 usa atraso_valido, nao situacao_voo).
 
                       voos_programados  cancelados  taxa_cancel_%     voos  OTP15_pct
 segmento_operacional                                                                 
@@ -373,14 +409,14 @@ passageiros                    4987882       99135           1.99  4888515      
 passageiros_regional            118838       22765          19.16    96027      83.32
 taxi_aereo                        6671        1605          24.06     5063      82.94
 
-KPI 6 no universo completo        : 2.71%
-KPI 6 somente passageiros         : 2.39%  (diferenca de -0.32 pp)
 OTP15 no universo completo        : 85.93%
 OTP15 somente passageiros         : 86.30%  (diferenca de +0.37 pp)
 
--> o efeito no KPI 6 e muito maior que no OTP15, porque carga e taxi
-   aereo cancelam em taxa varias vezes superior. Este e o argumento
-   central da decisao D3.
+-> o efeito do recorte de segmento e muito maior no KPI 6 (ver KPI6.0)
+   do que no OTP15, porque carga e taxi aereo cancelam em taxa varias
+   vezes superior, mas atrasam de forma proxima ao restante da malha.
+   Isso e o que motivou D3 a mudar o headline do KPI 6, e nao o do
+   OTP15.
 
 ==========================================================================
 B.8 — INTERPRETACAO EM QUATRO NIVEIS
@@ -389,7 +425,7 @@ B.8 — INTERPRETACAO EM QUATRO NIVEIS
   - OTP15 em YTD homologo varia de 84.53% a 93.28% entre 2019 e 2026.
   - 2019 (jan-jun): 85.79%. 2026 (jan-jun): 84.53%. Diferenca de -1.26 pp.
   - O melhor OTP15 ocorre no regime de baixa malha, com volume YTD em ~55% de 2019.
-  - Taxa de cancelamento em YTD varia de 1.78% a 3.64%.
+  - Taxa de cancelamento (headline D3: passageiros) em YTD varia de 1.65% a 3.21%.
   - A concentracao do impacto persiste em TODOS os anos (ICA5 de 53.67% a 74.51%).
   - Volume mensal e concentracao correlacionam negativamente (-0.741).
 
@@ -424,7 +460,13 @@ B.8 — INTERPRETACAO EM QUATRO NIVEIS
   - NAO podemos comparar operadoras aqui: sem controlar aeroporto e
     faixa horaria, a comparacao mede malha, nao desempenho (isso e o
     Bloco E, e depende do Bloco C).
-  - NAO podemos ler a taxa de cancelamento agregada como desempenho
-    comercial enquanto a decisao D3 estiver aberta: ela mistura carga,
-    taxi aereo e passageiros, que cancelam em taxas muito diferentes.
+  - NAO podemos tratar o cancelamento de 'todos os segmentos' (KPI6.0)
+    como desempenho comercial de passageiros: ele mistura carga e taxi
+    aereo, que cancelam em taxas muito superiores. E por isso que D3
+    definiu passageiros como headline -- a visao agregada segue
+    disponivel APENAS como sensibilidade, nunca como numero principal.
+  - NAO podemos presumir a natureza dos 143,230 voos 'nao classificado' (nem passageiro, nem carga):
+    eles ficam fora do headline e da visao 'carga + taxi aereo' ate que
+    exista evidencia verificavel de classificacao (ver docs/status_
+    projeto.md, secao D3).
 ```

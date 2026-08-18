@@ -349,52 +349,92 @@ def main() -> int:
     log("\n" + "-" * 74)
     log("R10 — VALIDADE DA CHEGADA (KPI 7)")
     log("-" * 74)
-    log("regra aprovada (decisao D1): SIMETRIA COM A PARTIDA")
-    log(f"  [1] chegada_prevista E chegada_real preenchidas")
-    log(f"  [2] |atraso_chegada_min| <= {LIMITE_ATRASO_CHEGADA_MIN} min "
-        f"({LIMITE_ATRASO_CHEGADA_MIN // 60}h) — mesmo limite de R5")
-    log(f"  [3] chegada_real >= partida_real (coerencia cronologica)")
-    log("  atraso_chegada_valido = atraso_valido AND chegada_valida")
+    log("regra aprovada (decisao D1): SIMETRIA COM A PARTIDA. Tres conceitos")
+    log("distintos, nao intercambiaveis:")
+    log("  DISPONIBILIDADE     : chegada_prevista E chegada_real preenchidas")
+    log("  VALIDADE INDIVIDUAL : disponivel E dentro do limite E cronologica")
+    log("  ELEGIBILIDADE KPI 7 : atraso_valido (partida) E validade individual")
 
     tem_chegada = df["chegada_prevista"].notna() & df["chegada_real"].notna()
     dentro_chegada = df["atraso_chegada_min"].abs() <= LIMITE_ATRASO_CHEGADA_MIN
     cronologica = df["chegada_real"] >= df["partida_real"]
 
-    df["chegada_valida"] = tem_chegada & dentro_chegada.fillna(False) & cronologica.fillna(False)
-    df["atraso_chegada_valido"] = df["atraso_valido"] & df["chegada_valida"]
+    # --- DISPONIBILIDADE ------------------------------------------------
+    df["chegada_disponivel"] = tem_chegada
+
+    # --- VALIDADE INDIVIDUAL DA CHEGADA (independe da partida) ----------
+    df["chegada_individualmente_valida"] = (
+        tem_chegada & dentro_chegada.fillna(False) & cronologica.fillna(False))
+
+    # --- ELEGIBILIDADE COMPLETA DO KPI 7 (combina partida e chegada) ----
+    df["atraso_chegada_valido"] = df["atraso_valido"] & df["chegada_individualmente_valida"]
     # Mesma condicao de atraso_chegada_valido, por construcao: a recuperacao e
     # a diferenca entre os dois atrasos e exige ambos validos. Nome proprio
     # mantido para que o consumidor do KPI 7 nao precise saber disso.
     df["recuperacao_valida"] = df["atraso_chegada_valido"]
 
-    # Motivo unico por registro, na ordem de precedencia de regras.py.
+    # --- FLAGS INDEPENDENTES, NAO MUTUAMENTE EXCLUSIVAS ------------------
+    # Cada uma testa UM problema isoladamente -- um registro pode ter varios
+    # simultaneamente. Usadas para nao esconder problemas multiplos atras de
+    # um motivo unico (ver qtd_motivos_invalidez_chegada abaixo).
+    df["problema_chegada_prevista_ausente"] = df["chegada_prevista"].isna()
+    df["problema_chegada_real_ausente"] = df["chegada_real"].isna()
+    df["problema_chegada_anterior_a_partida"] = (
+        tem_chegada & df["partida_real"].notna()
+        & (df["chegada_real"] < df["partida_real"]))
+    df["problema_atraso_chegada_acima_do_limite"] = tem_chegada & ~dentro_chegada.fillna(False)
+    df["problema_partida_invalida"] = ~df["atraso_valido"]
+
+    flags_problema = [
+        "problema_chegada_prevista_ausente", "problema_chegada_real_ausente",
+        "problema_chegada_anterior_a_partida",
+        "problema_atraso_chegada_acima_do_limite", "problema_partida_invalida",
+    ]
+    df["qtd_motivos_invalidez_chegada"] = df[flags_problema].sum(axis=1).astype("int8")
+
+    # --- MOTIVO PRINCIPAL: um so por registro, por ordem de precedencia --
+    # (ver MOTIVOS_INVALIDEZ_CHEGADA em regras.py). NAO significa que o
+    # registro tenha um unico problema -- ver qtd_motivos_invalidez_chegada.
     motivo = pd.Series(pd.NA, index=df.index, dtype="string")
-    motivo = motivo.mask(df["chegada_prevista"].isna(), "chegada_prevista_ausente")
-    motivo = motivo.mask(motivo.isna() & df["chegada_real"].isna(),
+    motivo = motivo.mask(df["problema_chegada_prevista_ausente"], "chegada_prevista_ausente")
+    motivo = motivo.mask(motivo.isna() & df["problema_chegada_real_ausente"],
                          "chegada_real_ausente")
-    motivo = motivo.mask(motivo.isna() & ~cronologica.fillna(False),
+    motivo = motivo.mask(motivo.isna() & df["problema_chegada_anterior_a_partida"],
                          "chegada_anterior_a_partida")
-    motivo = motivo.mask(motivo.isna() & ~dentro_chegada.fillna(False),
+    motivo = motivo.mask(motivo.isna() & df["problema_atraso_chegada_acima_do_limite"],
                          "atraso_chegada_acima_do_limite")
-    motivo = motivo.mask(motivo.isna() & ~df["atraso_valido"],
+    motivo = motivo.mask(motivo.isna() & df["problema_partida_invalida"],
                          "partida_invalida")
-    df["motivo_invalidez_chegada"] = motivo
+    df["motivo_principal_invalidez_chegada"] = motivo
 
     log("")
-    log(f"chegada_valida            : {int(df['chegada_valida'].sum()):,}")
-    log(f"atraso_chegada_valido     : {int(df['atraso_chegada_valido'].sum()):,} "
+    log(f"chegada_disponivel               : {int(df['chegada_disponivel'].sum()):,}")
+    log(f"chegada_individualmente_valida   : "
+        f"{int(df['chegada_individualmente_valida'].sum()):,}")
+    log(f"atraso_chegada_valido            : {int(df['atraso_chegada_valido'].sum()):,} "
         f"({df['atraso_chegada_valido'].mean():.2%} do universo)")
-    log(f"  base do KPI 7 (partida E chegada validas)")
+    log(f"  base do KPI 7 (elegibilidade completa: partida E chegada validas)")
     log("")
-    log("motivos de exclusao do KPI 7 (um motivo por registro, sem sobreposicao):")
-    contagem = df["motivo_invalidez_chegada"].value_counts(dropna=True)
+    log("motivo PRINCIPAL de exclusao do KPI 7 (1 por registro, por precedencia):")
+    contagem = df["motivo_principal_invalidez_chegada"].value_counts(dropna=True)
     log(contagem.to_frame("registros").assign(
         pct=lambda t: (t["registros"] / len(df) * 100).round(4)).to_string())
     log(f"total excluido            : {int(contagem.sum()):,}")
     log(f"conferencia (universo - validos): "
         f"{len(df) - int(df['atraso_chegada_valido'].sum()):,}")
-    log("-> registros invalidos NAO foram removidos; seguem auditaveis com o")
-    log("   motivo registrado em 'motivo_invalidez_chegada'.")
+    log("")
+    log("QUANTIDADE DE MOTIVOS APLICAVEIS por registro (independe de precedencia):")
+    dist_qtd = df["qtd_motivos_invalidez_chegada"].value_counts().sort_index()
+    log(dist_qtd.to_frame("registros").to_string())
+    log(f"-> {int((df['qtd_motivos_invalidez_chegada']>=2).sum()):,} registros tem 2 OU MAIS "
+        f"problemas aplicaveis simultaneamente; o motivo principal mostra so o de maior")
+    log("   precedencia. Exemplo: "
+        f"{int((df['problema_atraso_chegada_acima_do_limite'] & df['problema_partida_invalida']).sum()):,} "
+        "registros tem, ao mesmo tempo, atraso de chegada acima do limite E partida")
+    log("   invalida -- rotulados 'atraso_chegada_acima_do_limite' porque essa checagem")
+    log("   vem antes na ordem de precedencia, nao porque a partida esteja correta.")
+    log("-> registros invalidos NAO foram removidos; seguem auditaveis pelas 5 flags")
+    log("   'problema_*', pelo motivo principal e pela contagem de motivos aplicaveis.")
 
     # --- impacto sobre o KPI 7 -----------------------------------------
     log("")

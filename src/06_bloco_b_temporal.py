@@ -6,7 +6,11 @@ Responde:
            2026, considerando a quebra estrutural de VOLUME operado no periodo;
   P2     — que parcela dos voos responde pela maior parte dos minutos de
            atraso, e se essa concentracao mudou ao longo do tempo;
-  KPI 6  — taxa de cancelamento.
+  KPI 6  — taxa de cancelamento. Headline aprovado pela decisao D3
+           (2026-08-17, 3a rodada): operacoes de PASSAGEIROS com segmento
+           validado. Carga, taxi aereo, nao classificado e a visao agregada
+           de todos os segmentos sao reportados a parte, como sensibilidade
+           -- nao classificado nunca e presumido pax nem carga.
 
 Nota de nomenclatura (revisada em 2026-08-17, 2a rodada): os REGIMES deste
 bloco (ver regras.REGIMES_TEMPORAIS) sao rotulos de uma faixa do INDICE DE
@@ -367,70 +371,155 @@ def main() -> int:
     r("   nenhuma leitura causal e nenhum mecanismo especifico e afirmado aqui.")
 
     # ------------------------------------------------------------------
-    r.sec("B.6 — KPI 6: TAXA DE CANCELAMENTO")
+    r.sec("B.6 — KPI 6: TAXA DE CANCELAMENTO (decisao D3 APROVADA)")
     # ------------------------------------------------------------------
-    r("KPI 6 = CANCELADO / (REALIZADO + CANCELADO).")
-    r(f"'NÃO INFORMADO' ({nao_inf:,} registros) fica FORA do denominador.")
+    r("HEADLINE (decisao D3, aprovada): taxa de cancelamento das operacoes")
+    r("domesticas regulares de PASSAGEIROS com segmento validado --")
+    r("segmento_operacional em {'passageiros', 'passageiros_regional'}.")
     r("")
+    r("NENHUM registro foi removido da base. Carga, taxi aereo e nao")
+    r("classificado continuam no parquet e sao reportados abaixo, separados,")
+    r("nunca presumidos como passageiros nem como carga.")
+    r("")
+    r("Regra para 'NAO INFORMADO' (situacao_voo), valida para TODAS as visoes")
+    r("desta secao: fica FORA do denominador do KPI 6 em qualquer recorte.")
+    r(f"Motivo: sem desfecho declarado nao se pode afirmar nem cancelamento nem")
+    r(f"realizacao. {nao_inf:,} registros ({nao_inf/len(df):.4%} do universo)")
+    r("excluidos por essa regra -- documentados, nao descartados.")
+
+    PAX = ["passageiros", "passageiros_regional"]
+    CARGA_TAXI = ["carga", "taxi_aereo"]
+    NAO_CLASS = "nao_classificado"
+
     base_c = d[d["situacao_voo"].isin(["REALIZADO", "CANCELADO"])].copy()
     base_c["cancelado"] = base_c["situacao_voo"] == "CANCELADO"
     base_c_ytd = base_c[base_c["mes"] <= MESES_YTD]
+    base_pax = base_c[base_c["segmento_operacional"].isin(PAX)].copy()
+    base_pax_ytd = base_pax[base_pax["mes"] <= MESES_YTD]
 
-    r(f"--- KPI6.a  Serie anual em YTD HOMOLOGO (jan-{MESES_YTD:02d}) ---")
-    t_canc = base_c_ytd.groupby("ano").agg(
-        voos_programados=("cancelado", "size"),
-        cancelados=("cancelado", "sum"),
-    )
-    t_canc["taxa_cancel_%"] = (t_canc["cancelados"]
-                               / t_canc["voos_programados"] * 100).round(2)
+    def resumo_kpi6(sub: pd.DataFrame, nome: str, total: int) -> dict:
+        n = len(sub)
+        cancelados = int(sub["cancelado"].sum())
+        return {
+            "visao": nome,
+            "numerador_cancelados": cancelados,
+            "denominador_programados": n,
+            "taxa_cancel_%": round(cancelados / n * 100, 2) if n else float("nan"),
+            "cobertura_do_universo_%": round(n / total * 100, 2) if total else float("nan"),
+        }
+
+    total_c = len(base_c)
+    nao_class_n = int((base_c["segmento_operacional"] == NAO_CLASS).sum())
+    r("")
+    r("--- KPI6.0  As 4 visoes exigidas (universo completo, nao YTD) ---")
+    t_visoes = pd.DataFrame([
+        resumo_kpi6(base_pax, "[HEADLINE] passageiros", total_c),
+        resumo_kpi6(base_c[base_c["segmento_operacional"].isin(CARGA_TAXI)],
+                    "carga + taxi aereo", total_c),
+        resumo_kpi6(base_c[base_c["segmento_operacional"] == NAO_CLASS],
+                    "nao classificado", total_c),
+        resumo_kpi6(base_c, "todos os segmentos (sensibilidade)", total_c),
+    ]).set_index("visao")
+    r(t_visoes.to_string())
+    r("")
+    r(f"nao classificados: {nao_class_n:,} registros "
+      f"({nao_class_n/total_c:.2%} do denominador REALIZADO+CANCELADO)")
+    r("-> ficam FORA do headline e fora de 'carga + taxi aereo' -- so aparecem")
+    r("   em 'todos os segmentos', que existe UNICAMENTE como sensibilidade.")
+    r("   Nenhuma classificacao foi presumida para eles (ver D3 em")
+    r("   docs/status_projeto.md).")
+
+    r("")
+    r(f"--- KPI6.a  Serie anual do HEADLINE em YTD HOMOLOGO (jan-{MESES_YTD:02d}) ---")
+    g_pax_ytd = base_pax_ytd.groupby("ano")
+    g_todos_ytd = base_c_ytd.groupby("ano")
+    t_canc = pd.DataFrame({
+        "numerador_cancelados": g_pax_ytd["cancelado"].sum(),
+        "denominador_programados": g_pax_ytd.size(),
+    })
+    t_canc["taxa_cancel_%"] = (t_canc["numerador_cancelados"]
+                               / t_canc["denominador_programados"] * 100).round(2)
+    total_ano_ytd = g_todos_ytd.size()
+    nao_cl_ano_ytd = (base_c_ytd[base_c_ytd["segmento_operacional"] == NAO_CLASS]
+                      .groupby("ano").size())
+    t_canc["cobertura_classificacao_%"] = (t_canc["denominador_programados"]
+                                           / total_ano_ytd * 100).round(2)
+    t_canc["nao_classificados_n"] = (nao_cl_ano_ytd.reindex(t_canc.index)
+                                     .fillna(0).astype(int))
+    t_canc["nao_classificados_%"] = (t_canc["nao_classificados_n"]
+                                     / total_ano_ytd.reindex(t_canc.index) * 100).round(2)
     t_canc["regime"] = [regime_do_ano(a) for a in t_canc.index]
     t_canc.index = [rotulo_ano(a, parciais) for a in t_canc.index]
     r(t_canc.to_string())
     r("")
-    r(f"amplitude: {t_canc['taxa_cancel_%'].min():.2f}% a "
+    r(f"amplitude (headline passageiros): {t_canc['taxa_cancel_%'].min():.2f}% a "
       f"{t_canc['taxa_cancel_%'].max():.2f}% "
       f"({t_canc['taxa_cancel_%'].max() - t_canc['taxa_cancel_%'].min():.2f} pp)")
+    r("'cobertura_classificacao_%' = share do denominador total (REALIZADO+")
+    r("CANCELADO daquele ano) que e passageiros -- o complemento inclui carga,")
+    r("taxi aereo E nao classificado. 'NAO INFORMADO' ja fora do denominador.")
 
     r("")
-    r("--- KPI6.b  Por regime ---")
-    t_reg_c = base_c_ytd.groupby("regime").agg(
-        voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
-    t_reg_c["taxa_cancel_%"] = (t_reg_c["cancelados"]
-                                / t_reg_c["voos_programados"] * 100).round(2)
+    r("--- KPI6.b  HEADLINE por regime ---")
+    g_pax_reg = base_pax_ytd.groupby("regime")
+    g_todos_reg = base_c_ytd.groupby("regime")
+    t_reg_c = pd.DataFrame({
+        "numerador_cancelados": g_pax_reg["cancelado"].sum(),
+        "denominador_programados": g_pax_reg.size(),
+    })
+    t_reg_c["taxa_cancel_%"] = (t_reg_c["numerador_cancelados"]
+                                / t_reg_c["denominador_programados"] * 100).round(2)
+    total_reg = g_todos_reg.size()
+    t_reg_c["cobertura_classificacao_%"] = (t_reg_c["denominador_programados"]
+                                            / total_reg * 100).round(2)
     r(t_reg_c.to_string())
 
     r("")
-    r(f"--- KPI6.c  Por operadora analitica (volume minimo "
-      f"{VOLUME_MINIMO_COMPANHIA:,}) ---")
-    t_op = base_c.groupby("operadora_analitica").agg(
-        voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
-    t_op["taxa_cancel_%"] = (t_op["cancelados"]
-                             / t_op["voos_programados"] * 100).round(2)
-    excluidas = t_op[t_op["voos_programados"] < VOLUME_MINIMO_COMPANHIA]
-    t_op = t_op[t_op["voos_programados"] >= VOLUME_MINIMO_COMPANHIA]
+    r(f"--- KPI6.c  HEADLINE por operadora analitica (volume minimo "
+      f"{VOLUME_MINIMO_COMPANHIA:,} de voos de passageiros) ---")
+    g_pax_op = base_pax.groupby("operadora_analitica")
+    t_op = pd.DataFrame({
+        "numerador_cancelados": g_pax_op["cancelado"].sum(),
+        "denominador_programados": g_pax_op.size(),
+    })
+    t_op["taxa_cancel_%"] = (t_op["numerador_cancelados"]
+                             / t_op["denominador_programados"] * 100).round(2)
+    excluidas = t_op[t_op["denominador_programados"] < VOLUME_MINIMO_COMPANHIA]
+    t_op = t_op[t_op["denominador_programados"] >= VOLUME_MINIMO_COMPANHIA]
     r(t_op.sort_values("taxa_cancel_%").to_string())
     if len(excluidas):
         r("")
-        r(f"recortes EXCLUIDOS por volume < {VOLUME_MINIMO_COMPANHIA:,}: "
-          f"{list(excluidas.index)}")
-        r("  (o corte deixou de ser inerte apos a decisao D2, que separou")
-        r("   operadoras pequenas antes escondidas dentro de 'Outros')")
+        r(f"operadoras de PASSAGEIROS excluidas por volume < "
+          f"{VOLUME_MINIMO_COMPANHIA:,}: {list(excluidas.index)}")
+        r("  (operadoras cujo volume de passageiros e pequeno, mesmo que o volume")
+        r("   TOTAL da operadora -- incluindo carga/taxi aereo -- seja maior)")
+    r("")
+    r("Sensibilidade -- mesma tabela em 'todos os segmentos' (nao apenas")
+    r("passageiros), para comparacao direta:")
+    t_op_todos = base_c.groupby("operadora_analitica").agg(
+        voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
+    t_op_todos["taxa_cancel_%"] = (t_op_todos["cancelados"]
+                                   / t_op_todos["voos_programados"] * 100).round(2)
+    t_op_todos = t_op_todos[t_op_todos["voos_programados"] >= VOLUME_MINIMO_COMPANHIA]
+    r(t_op_todos.sort_values("taxa_cancel_%").to_string())
 
     r("")
-    r("--- KPI6.d  Piores meses de cancelamento ---")
-    t_mes_c = base_c.groupby("ano_mes").agg(
-        voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
-    t_mes_c["taxa_%"] = (t_mes_c["cancelados"]
-                         / t_mes_c["voos_programados"] * 100).round(2)
+    r("--- KPI6.d  Piores meses de cancelamento (HEADLINE) ---")
+    g_pax_mes = base_pax.groupby("ano_mes")
+    t_mes_c = pd.DataFrame({
+        "numerador_cancelados": g_pax_mes["cancelado"].sum(),
+        "denominador_programados": g_pax_mes.size(),
+    })
+    t_mes_c["taxa_%"] = (t_mes_c["numerador_cancelados"]
+                         / t_mes_c["denominador_programados"] * 100).round(2)
     r(t_mes_c.nlargest(10, "taxa_%").to_string())
 
     # ------------------------------------------------------------------
-    r.sec("B.7 — SENSIBILIDADE: SEGMENTO OPERACIONAL (decisao D3 PENDENTE)")
+    r.sec("B.7 — SEGMENTO OPERACIONAL: DETALHE E SENSIBILIDADE (D3 APROVADA)")
     # ------------------------------------------------------------------
-    r("A decisao D3 (se passageiros deve ser o recorte principal) esta ABERTA.")
-    r("Enquanto isso, as series acima cobrem o universo COMPLETO -- comportamento")
-    r("atual, sem regra nova. Esta secao mostra o que mudaria, para que a")
-    r("escolha seja informada em vez de implicita.")
+    r("D3 decidiu o HEADLINE (B.6); esta secao detalha os segmentos que ficam")
+    r("fora dele e reune a comparacao de OTP15, que a decisao D3 nao altera")
+    r("(D3 e sobre o KPI 6 -- OTP15 usa atraso_valido, nao situacao_voo).")
     r("")
     seg_c = base_c.groupby("segmento_operacional").agg(
         voos_programados=("cancelado", "size"), cancelados=("cancelado", "sum"))
@@ -441,21 +530,17 @@ def main() -> int:
         OTP15_pct=("atrasado_15", lambda s: round((1 - s.mean()) * 100, 2)))
     r(seg_c.join(seg_p, how="outer").to_string())
     r("")
-    pax = ["passageiros", "passageiros_regional"]
-    total_c = base_c["cancelado"].mean() * 100
-    pax_c = base_c[base_c["segmento_operacional"].isin(pax)]["cancelado"].mean() * 100
     total_o = (1 - base_p["atrasado_15"].mean()) * 100
-    pax_o = (1 - base_p[base_p["segmento_operacional"].isin(pax)]["atrasado_15"].mean()) * 100
-    r(f"KPI 6 no universo completo        : {total_c:.2f}%")
-    r(f"KPI 6 somente passageiros         : {pax_c:.2f}%  "
-      f"(diferenca de {pax_c - total_c:+.2f} pp)")
+    pax_o = (1 - base_p[base_p["segmento_operacional"].isin(PAX)]["atrasado_15"].mean()) * 100
     r(f"OTP15 no universo completo        : {total_o:.2f}%")
     r(f"OTP15 somente passageiros         : {pax_o:.2f}%  "
       f"(diferenca de {pax_o - total_o:+.2f} pp)")
     r("")
-    r("-> o efeito no KPI 6 e muito maior que no OTP15, porque carga e taxi")
-    r("   aereo cancelam em taxa varias vezes superior. Este e o argumento")
-    r("   central da decisao D3.")
+    r("-> o efeito do recorte de segmento e muito maior no KPI 6 (ver KPI6.0)")
+    r("   do que no OTP15, porque carga e taxi aereo cancelam em taxa varias")
+    r("   vezes superior, mas atrasam de forma proxima ao restante da malha.")
+    r("   Isso e o que motivou D3 a mudar o headline do KPI 6, e nao o do")
+    r("   OTP15.")
 
     # ------------------------------------------------------------------
     r.sec("B.8 — INTERPRETACAO EM QUATRO NIVEIS")
@@ -469,8 +554,8 @@ def main() -> int:
       f"Diferenca de {otp_2026 - otp_2019:+.2f} pp.")
     r(f"  - O melhor OTP15 ocorre no regime de baixa malha, com volume YTD em "
       f"~55% de 2019.")
-    r(f"  - Taxa de cancelamento em YTD varia de {t_canc['taxa_cancel_%'].min():.2f}% "
-      f"a {t_canc['taxa_cancel_%'].max():.2f}%.")
+    r(f"  - Taxa de cancelamento (headline D3: passageiros) em YTD varia de "
+      f"{t_canc['taxa_cancel_%'].min():.2f}% a {t_canc['taxa_cancel_%'].max():.2f}%.")
     r(f"  - A concentracao do impacto persiste em TODOS os anos "
       f"(ICA{PERCENTIL_ICA} de {t_conc[col_ica].min():.2f}% a {t_conc[col_ica].max():.2f}%).")
     r(f"  - Volume mensal e concentracao correlacionam negativamente "
@@ -507,9 +592,16 @@ def main() -> int:
     r("  - NAO podemos comparar operadoras aqui: sem controlar aeroporto e")
     r("    faixa horaria, a comparacao mede malha, nao desempenho (isso e o")
     r("    Bloco E, e depende do Bloco C).")
-    r("  - NAO podemos ler a taxa de cancelamento agregada como desempenho")
-    r("    comercial enquanto a decisao D3 estiver aberta: ela mistura carga,")
-    r("    taxi aereo e passageiros, que cancelam em taxas muito diferentes.")
+    r("  - NAO podemos tratar o cancelamento de 'todos os segmentos' (KPI6.0)")
+    r("    como desempenho comercial de passageiros: ele mistura carga e taxi")
+    r("    aereo, que cancelam em taxas muito superiores. E por isso que D3")
+    r("    definiu passageiros como headline -- a visao agregada segue")
+    r("    disponivel APENAS como sensibilidade, nunca como numero principal.")
+    r("  - NAO podemos presumir a natureza dos "
+      f"{nao_class_n:,} voos 'nao classificado' (nem passageiro, nem carga):")
+    r("    eles ficam fora do headline e da visao 'carga + taxi aereo' ate que")
+    r("    exista evidencia verificavel de classificacao (ver docs/status_")
+    r("    projeto.md, secao D3).")
 
     # ------------------------------------------------------------------
     SAIDA.parent.mkdir(parents=True, exist_ok=True)

@@ -76,17 +76,27 @@ LIMITE_ATRASO_MIN: int = 24 * 60
 # partida, mais coerencia cronologica. Nao se introduz limiar novo -- reusa
 # LIMITE_ATRASO_MIN, que ja era documentado em R5.
 #
-#   chegada_valida =
-#         chegada_prevista preenchida
-#     AND chegada_real preenchida
+# TRES CONCEITOS DISTINTOS, com nomes proprios (corrigido na 3a rodada: o
+# nome antigo 'chegada_valida' misturava disponibilidade com validade e foi
+# citado incorretamente em texto como "chegada registrada"):
+#
+#   chegada_disponivel =                                    (DISPONIBILIDADE)
+#         chegada_prevista preenchida AND chegada_real preenchida
+#
+#   chegada_individualmente_valida =                    (VALIDADE INDIVIDUAL)
+#         chegada_disponivel
 #     AND |atraso_chegada_min| <= LIMITE_ATRASO_CHEGADA_MIN
 #     AND chegada_real >= partida_real          (coerencia cronologica)
 #
-#   atraso_chegada_valido = atraso_valido AND chegada_valida
+#   atraso_chegada_valido =                       (ELEGIBILIDADE COMPLETA KPI7)
+#         atraso_valido AND chegada_individualmente_valida
 #   recuperacao_valida    = atraso_chegada_valido   (mesma condicao, ver R10)
 #
-# Registros invalidos NAO sao removidos: recebem flag False e o motivo fica
-# em 'motivo_invalidez_chegada', para permanecerem auditaveis.
+# Registros invalidos NAO sao removidos. Alem do motivo principal (precedencia
+# abaixo), 5 flags 'problema_*' independentes registram CADA condicao
+# isoladamente (nao mutuamente exclusivas), e 'qtd_motivos_invalidez_chegada'
+# conta quantas se aplicam ao mesmo tempo -- para que o motivo principal nunca
+# esconda um segundo problema real. Ver docs/status_projeto.md, secao do KPI 7.
 LIMITE_ATRASO_CHEGADA_MIN: int = LIMITE_ATRASO_MIN
 
 # Corte alternativo mantido como analise de sensibilidade obrigatoria do KPI 7
@@ -636,7 +646,13 @@ SEMENTE_ALEATORIA: int = 42
 # robustez -- efeito colateral documentado em docs/status_projeto.md.
 VOLUME_MINIMO_COMPANHIA: int = 50_000
 
-# --- 2) Ranking AEROPORTO x FAIXA_3H (celulas de P11) -----------------------
+# --- 2) Celula AEROPORTO x FAIXA_3H no HISTORICO COMPLETO (H2 do Bloco C) --
+# ATENCAO: este parametro foi estudado sobre 2019-2026 (todo o historico) e e
+# usado pela decomposicao de variancia de H2 (Bloco C), que quer o MAXIMO de
+# dado disponivel para separar sinal de ruido. NAO e o parametro do ranking
+# operacional do P11 -- esse tem horizonte de 12 meses (ver secao 4 abaixo,
+# VOLUME_MINIMO_CELULA_P11) e por isso PRECISA de um corte proprio: reusar
+# este valor para uma janela ~7,5x menor sub-cobriria o ranking sem aviso.
 #
 # Distribuicao medida em 2026-08-17 sobre o universo de calculo (5.193.012
 # voos com atraso_valido), cruzando os 245 aeroportos com atraso_valido pelas
@@ -696,6 +712,104 @@ VOLUME_MINIMO_AEROPORTO_FAIXA: int = 1_000
 # meses (97,8%).
 VOLUME_MINIMO_SERIE_MENSAL: int = 10_000
 
+# --- 4) HORIZONTE e celula do RANKING OPERACIONAL (P11, decisao D5) -------
+#
+# Decisao do usuario (2026-08-18): a priorizacao operacional principal (P11)
+# usa os ULTIMOS 12 MESES COMPLETOS disponiveis, nao o historico inteiro.
+# 2019-2026 continua disponivel como CONTEXTO HISTORICO e teste de
+# estabilidade (Bloco C, H2, series do Bloco B) -- nunca como base do ranking.
+HORIZONTE_P11_INICIO: str = "2025-07"
+HORIZONTE_P11_FIM: str = "2026-06"
+MESES_HORIZONTE_P11: int = 12
+
+# 2026 e ANO parcial (R9, so 6 meses), mas os 12 meses INDIVIDUAIS da janela
+# movel acima estao todos completos -- nenhum e um mes truncado. As duas
+# afirmacoes nao se contradizem: "ano parcial" e sobre o calendario anual,
+# "janela movel completa" e sobre a contagem de meses fechados que ela cobre.
+
+# Distribuicao medida em 2026-08-18 sobre o universo de calculo restrito a
+# HORIZONTE_P11 (atraso_valido=True, jul/2025 a jun/2026): 788.851 voos, 145
+# aeroportos, 625 celulas aeroporto x faixa_3h nao vazias (de 1.221 no
+# historico completo -- MENOS da metade, porque a janela e ~7,5x mais curta):
+#
+#     percentil   voos na celula (12 meses)
+#     min                    1
+#     10%                    9
+#     25%                   48
+#     50%                  213
+#     75%                1.007
+#     90%                3.414
+#     95%                6.104
+#     99%               16.735
+#     max               20.472
+#
+# Sensibilidade do corte (sobre as 625 celulas / 788.851 voos da janela):
+#
+#     corte >=      0 :  625 celulas (100,0%)  cobrindo 100,0% dos voos
+#     corte >=     50 :  466 celulas ( 74,6%)  cobrindo  99,6% dos voos
+#     corte >=    100 :  398 celulas ( 63,7%)  cobrindo  99,0% dos voos
+#     corte >=    250 :  301 celulas ( 48,2%)  cobrindo  97,0% dos voos
+#     corte >=    500 :  234 celulas ( 37,4%)  cobrindo  94,0% dos voos
+#     corte >=  1.000 :  158 celulas ( 25,3%)  cobrindo  87,3% dos voos
+#     corte >=  2.000 :   94 celulas ( 15,0%)  cobrindo  75,5% dos voos
+#
+# O corte de 1.000 usado por VOLUME_MINIMO_AEROPORTO_FAIXA (historico
+# completo) NAO pode ser reaproveitado aqui: nesta janela ele deixaria de
+# fora 12,7% do volume (contra apenas 3,0% no historico completo) -- a mesma
+# contagem absoluta de voos e MUITO mais restritiva numa janela ~7,5x menor.
+#
+# Restrito aos 12 maiores aeroportos da janela (TOP_N_AEROPORTOS; 92 celulas
+# possiveis, min=17, mediana=4.960, max=20.472):
+#
+#     corte >=    100 :  88 de 92 celulas (95,7%)
+#     corte >=    250 :  86 de 92 celulas (93,5%)
+#     corte >=    500 :  85 de 92 celulas (92,4%)
+#     corte >=  1.000 :  81 de 92 celulas (88,0%)
+#
+# Margem de erro aproximada (Wald, IC 95%) de uma taxa perto de 85% (ordem de
+# grandeza do OTP15) por tamanho de celula:
+#
+#     n=    100 : +-7,0 pp
+#     n=    250 : +-4,4 pp
+#     n=    500 : +-3,1 pp
+#     n=  1.000 : +-2,2 pp
+#
+# ESCOLHA: 500. Cobre 94,0% do volume da janela (contra 87,3% do corte de
+# 1.000) e exclui so 7 das 92 celulas dos 12 maiores aeroportos -- as faixas
+# de menor movimento (normalmente madrugada) desses aeroportos. Margem de
+# erro de +-3,1 pp e maior que a do corte de 1.000 (+-2,2 pp), mas o ranking
+# de P11 ordena por MINUTOS ACUMULADOS de atraso (nao por taxa isolada) --
+# celulas de alto impacto tendem a ter volume alto por construcao, logo o
+# corte afeta pouco o TOPO do ranking; afeta mais a cauda de baixo volume,
+# que de qualquer forma nao competiria pelo topo. Revisitavel se a decisao de
+# elegibilidade do P11 (criterio 1 de 5, ver docs/status_projeto.md) pedir
+# outro compromisso entre cobertura e precisao.
+VOLUME_MINIMO_CELULA_P11: int = 500
+
+# Demais criterios de elegibilidade avaliados (decisao do usuario, 2026-08-18):
+# volume minimo (acima), cobertura de partidas validas, meses de operacao,
+# estabilidade entre subperiodos e concentracao por operadora. Medidos sobre
+# as 234 celulas que passam VOLUME_MINIMO_CELULA_P11, no HORIZONTE_P11:
+#
+#   cobertura de partidas validas (atraso_valido / REALIZADO na celula):
+#     media 99,997%, minimo 99,56% -- criterio NAO BINDING: nenhuma celula
+#     com volume>=500 tem cobertura abaixo de 95%. Mantido como guarda
+#     explicita, nao porque filtre algo hoje.
+#   meses com operacao (de 12): 232 de 234 tem os 12 meses completos; 2 tem
+#     11. Tambem NAO BINDING num limiar de 10 -- documentado pela mesma razao.
+#   |delta OTP15| entre subperiodos (H1 jul-dez/2025 vs H2 jan-jun/2026):
+#     media 2,65 pp, mediana 2,04 pp, p97,5 ~10 pp, maximo 15,7 pp. Only 6 de
+#     234 excedem 10 pp -- FLAG, nao exclusao: uma celula instavel pode ainda
+#     ser a maior prioridade em minutos acumulados.
+#   share da maior operadora na celula: media 55,9%, mediana 53,1%, 18 de 234
+#     acima de 80%. FLAG, nao exclusao (instrucao explicita do usuario): uma
+#     celula dominada por uma unica operadora pode ser prioridade real, nao
+#     um artefato a descartar.
+COBERTURA_MINIMA_PARTIDAS_VALIDAS_P11: float = 95.0
+MESES_MINIMOS_OPERACAO_P11: int = 10
+LIMIAR_INSTABILIDADE_P11_PP: float = 10.0
+LIMIAR_CONCENTRACAO_OPERADORA_P11: float = 80.0
+
 
 # ---------------------------------------------------------------------------
 # DECISOES REGISTRADAS
@@ -710,6 +824,16 @@ VOLUME_MINIMO_SERIE_MENSAL: int = 10_000
 #      5.193.587, 145, 146, 655) foram explicados sem alterar a regra --
 #      ver comentario de MOTIVOS_INVALIDEZ_CHEGADA acima e
 #      docs/status_projeto.md.
+#      TERMINOLOGIA CORRIGIDA (3a rodada, 2026-08-17): a diferenca
+#      5.193.587 - 5.192.866 = 721 (nao 145) e a soma exata de 655
+#      ('atraso_chegada_acima_do_limite') + 65 ('partida_invalida') + 1
+#      ('chegada_anterior_a_partida'), verificado sobre o universo real. O
+#      nome 'chegada_valida' foi separado em 'chegada_disponivel'
+#      (presenca), 'chegada_individualmente_valida' (validade da chegada por
+#      si so) e 'atraso_chegada_valido' (elegibilidade completa do KPI 7),
+#      para nao confundir disponibilidade com validade. Adicionadas 5 flags
+#      'problema_*' independentes e 'qtd_motivos_invalidez_chegada' -- ver
+#      R10 acima.
 #
 # D2 — DIMENSAO DE COMPANHIA .................. APROVADA em 2026-08-17;
 #                                                RESOLUCAO CORRIGIDA na 2a rodada
@@ -731,15 +855,15 @@ VOLUME_MINIMO_SERIE_MENSAL: int = 10_000
 #      local por aeroporto NAO confirmado pela ANAC -- ver
 #      LIMITACAO_FUSO_HORARIO.
 #
-# ---------------------------------------------------------------------------
-# PENDENCIAS — regras NAO decididas
-# ---------------------------------------------------------------------------
-# D3 — ESCOPO DE OPERADOR ..................... PENDENTE
-#      O universo mistura passageiros, carga e taxi aereo numa analise cuja
-#      narrativa de negocio e a experiencia do passageiro.
-#      Efeito medido: no ICA5 geral, -0,65 pp (irrelevante). No grupo
-#      "Outros", carga+taxi puxam o OTP15. No KPI 6 o efeito e grande:
-#      cancelamento de ~2% (passageiros) a ~23% (taxi aereo).
+# D3 — ESCOPO DE OPERADOR ..................... APROVADA em 2026-08-17 (3a rodada)
+#      HEADLINE do KPI 6 (06_bloco_b_temporal.py, secao B.6): taxa de
+#      cancelamento das operacoes domesticas regulares de PASSAGEIROS com
+#      segmento validado (segmento_operacional em {'passageiros',
+#      'passageiros_regional'}). Nenhum registro foi removido -- carga, taxi
+#      aereo e nao_classificado seguem reportados separadamente (KPI6.0), mais
+#      a visao agregada 'todos os segmentos' como sensibilidade OBRIGATORIA,
+#      nao substituivel pelo headline. nao_classificado NUNCA e presumido
+#      passageiro nem carga.
 #      Auditoria de 'nao_classificado' (2a rodada, 153.281 voos, 113 codigos):
 #      95,28% concentrados em 4 codigos (PTB Passaredo, PAM MAP, ONE Oceanair/
 #      Avianca Brasil, IPM Itapemirim) -- companhias de passageiros conhecidas
@@ -748,7 +872,19 @@ VOLUME_MINIMO_SERIE_MENSAL: int = 10_000
 #      voos) tinham marcador explicito ('CARGO'/'TAXI AEREO') e foram
 #      incorporados a SEGMENTO_CARGA/SEGMENTO_TAXI_AEREO nesta rodada -- essa
 #      extensao usa o MESMO padrao de evidencia ja em vigor, nao e decisao
-#      nova de negocio.
-#      SEGMENTO_CARGA e SEGMENTO_TAXI_AEREO permanecem atributo DESCRITIVO e
-#      NAO filtram nada. O que D3 decide e se o segmento passa a ser recorte
-#      principal. Ver docs/status_projeto.md.
+#      nova de negocio. Esses 4 codigos permanecem 'nao_classificado' --
+#      reclassifica-los exigiria conhecimento externo a fonte, fora do padrao
+#      de evidencia aceito aqui.
+#      SEGMENTO_CARGA e SEGMENTO_TAXI_AEREO continuam atributo DESCRITIVO da
+#      fonte (razao social), sem confirmacao oficial da ANAC. Ver
+#      docs/status_projeto.md.
+#
+# D5 — HORIZONTE E ELEGIBILIDADE DO P11 ....... APROVADA em 2026-08-18
+#      Ranking operacional principal usa os ULTIMOS 12 MESES COMPLETOS
+#      (HORIZONTE_P11_INICIO..HORIZONTE_P11_FIM = jul/2025 a jun/2026), nao o
+#      historico inteiro. 2019-2026 fica como contexto e teste de
+#      estabilidade. Corte de celula proprio da janela
+#      (VOLUME_MINIMO_CELULA_P11 = 500), recalculado sobre a distribuicao dos
+#      12 meses -- NAO reaproveita VOLUME_MINIMO_AEROPORTO_FAIXA (=1.000),
+#      que foi estudado sobre o historico completo e sub-cobriria a janela
+#      curta sem aviso. Ver secao 4 acima e docs/status_projeto.md.

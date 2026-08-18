@@ -43,9 +43,13 @@ COLUNAS_DERIVADAS = [
     "grupo_companhia", "ano_parcial",
     # decisao D2
     "operadora_analitica", "grupo_economico", "segmento_operacional",
-    # decisao D1 (R10)
-    "chegada_valida", "atraso_chegada_valido", "recuperacao_valida",
-    "motivo_invalidez_chegada",
+    # decisao D1 (R10) -- terminologia corrigida na 3a rodada
+    "chegada_disponivel", "chegada_individualmente_valida",
+    "atraso_chegada_valido", "recuperacao_valida",
+    "motivo_principal_invalidez_chegada", "qtd_motivos_invalidez_chegada",
+    "problema_chegada_prevista_ausente", "problema_chegada_real_ausente",
+    "problema_chegada_anterior_a_partida",
+    "problema_atraso_chegada_acima_do_limite", "problema_partida_invalida",
     # decisao D4 (R11)
     "faixa_3h", "periodo_dia",
 ]
@@ -257,11 +261,14 @@ def test_r10_coerencia_cronologica_da_chegada(caminho_universo):
 def test_r10_base_do_kpi7(caminho_universo):
     """A base do KPI 7 exige partida E chegada validas (decisao D1)."""
     df = pd.read_parquet(caminho_universo, columns=[
-        "atraso_valido", "chegada_valida", "atraso_chegada_valido",
-        "recuperacao_valida", "recuperacao_min", "atraso_chegada_min"])
+        "atraso_valido", "chegada_disponivel", "chegada_individualmente_valida",
+        "atraso_chegada_valido", "recuperacao_valida", "recuperacao_min",
+        "atraso_chegada_min"])
     assert int(df["atraso_chegada_valido"].sum()) == N_ATRASO_CHEGADA_VALIDO
-    # atraso_chegada_valido = atraso_valido AND chegada_valida, exatamente
-    esperado = df["atraso_valido"] & df["chegada_valida"]
+    # disponibilidade e pre-condicao necessaria (mas nao suficiente) da validade
+    assert (df["chegada_individualmente_valida"] & ~df["chegada_disponivel"]).sum() == 0
+    # atraso_chegada_valido = atraso_valido AND chegada_individualmente_valida
+    esperado = df["atraso_valido"] & df["chegada_individualmente_valida"]
     assert df["atraso_chegada_valido"].equals(esperado)
     # recuperacao_valida e a mesma condicao, por construcao
     assert df["recuperacao_valida"].equals(df["atraso_chegada_valido"])
@@ -273,22 +280,24 @@ def test_r10_base_do_kpi7(caminho_universo):
     assert int(df["atraso_chegada_valido"].sum()) <= N_ATRASO_VALIDO
 
 
-def test_r10_motivo_de_invalidez_e_unico_e_fecha_a_conta(caminho_universo):
+def test_r10_motivo_principal_e_unico_e_fecha_a_conta(caminho_universo):
     """
-    Cada registro excluido do KPI 7 tem UM motivo, e a soma dos motivos fecha
-    com o total de excluidos. Sem isso a auditoria do filtro seria impossivel.
+    Cada registro excluido do KPI 7 tem UM motivo PRINCIPAL, e a soma dos
+    motivos fecha com o total de excluidos. Sem isso a auditoria do filtro
+    seria impossivel. 'Principal' nao significa 'unico problema' -- ver
+    test_r10_qtd_motivos_aplicaveis_bate_com_as_flags_independentes.
     """
     df = pd.read_parquet(caminho_universo, columns=[
-        "atraso_chegada_valido", "motivo_invalidez_chegada"])
+        "atraso_chegada_valido", "motivo_principal_invalidez_chegada"])
     validos = df["atraso_chegada_valido"]
     # motivo preenchido exatamente onde invalido
-    assert df.loc[validos, "motivo_invalidez_chegada"].isna().all(), (
+    assert df.loc[validos, "motivo_principal_invalidez_chegada"].isna().all(), (
         "registro valido nao pode ter motivo de invalidez"
     )
-    assert df.loc[~validos, "motivo_invalidez_chegada"].notna().all(), (
+    assert df.loc[~validos, "motivo_principal_invalidez_chegada"].notna().all(), (
         "registro invalido sem motivo registrado"
     )
-    contagem = df["motivo_invalidez_chegada"].value_counts()
+    contagem = df["motivo_principal_invalidez_chegada"].value_counts()
     assert contagem.sum() == len(df) - N_ATRASO_CHEGADA_VALIDO
     # todos os motivos observados tem de estar declarados em regras.py
     assert set(contagem.index) <= set(regras.MOTIVOS_INVALIDEZ_CHEGADA), (
@@ -302,11 +311,38 @@ def test_r10_registros_invalidos_foram_preservados(caminho_universo):
     Os 655 registros com |atraso_chegada| > 24h devem seguir na base.
     """
     df = pd.read_parquet(caminho_universo, columns=[
-        "atraso_chegada_min", "atraso_chegada_valido", "motivo_invalidez_chegada"])
+        "atraso_chegada_min", "atraso_chegada_valido",
+        "motivo_principal_invalidez_chegada"])
     extremos = df[df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN]
     assert len(extremos) > 0, "os registros extremos de chegada desapareceram"
     assert not extremos["atraso_chegada_valido"].any()
-    assert extremos["motivo_invalidez_chegada"].notna().all()
+    assert extremos["motivo_principal_invalidez_chegada"].notna().all()
+
+
+def test_r10_qtd_motivos_aplicaveis_bate_com_as_flags_independentes(caminho_universo):
+    """
+    'qtd_motivos_invalidez_chegada' precisa ser exatamente a soma das 5 flags
+    'problema_*' independentes -- e essas 5 flags precisam, juntas, fechar com
+    o motivo principal (o motivo principal e sempre uma das flags == True).
+    """
+    flags = [
+        "problema_chegada_prevista_ausente", "problema_chegada_real_ausente",
+        "problema_chegada_anterior_a_partida",
+        "problema_atraso_chegada_acima_do_limite", "problema_partida_invalida",
+    ]
+    df = pd.read_parquet(caminho_universo, columns=[
+        *flags, "qtd_motivos_invalidez_chegada", "atraso_chegada_valido",
+        "motivo_principal_invalidez_chegada"])
+    soma = df[flags].sum(axis=1)
+    assert (df["qtd_motivos_invalidez_chegada"] == soma).all()
+    # zero problemas <=> elegivel; 1+ problemas <=> invalido
+    assert (df["qtd_motivos_invalidez_chegada"] == 0).equals(df["atraso_chegada_valido"])
+    # onde ha 2+ motivos aplicaveis, o principal e so um deles -- confirma
+    # que 'motivo principal' nunca esconde a existencia de outros problemas,
+    # so escolhe qual aparece.
+    dois_ou_mais = df["qtd_motivos_invalidez_chegada"] >= 2
+    assert dois_ou_mais.sum() > 0
+    assert df.loc[dois_ou_mais, "motivo_principal_invalidez_chegada"].notna().all()
 
 
 def test_r10_kpi7_mediana_estavel_e_extremos_tratados(caminho_universo):
@@ -436,21 +472,45 @@ def test_d2_azul_mainline_e_conecta_sao_operadoras_distintas(caminho_universo):
     )
 
 
-def test_d3_segmento_nao_filtra_nada_ainda(caminho_universo):
+def test_d3_segmento_permanece_atributo_descritivo_apos_aprovacao(caminho_universo):
     """
-    Decisao D3 PENDENTE: o segmento e atributo descritivo. Carga e taxi aereo
-    devem seguir PRESENTES no universo -- se desaparecerem, alguem aplicou D3
-    sem registrar a decisao. Valores atualizados em 2026-08-17 (2a rodada):
-    6 codigos com marcador explicito de segmento na razao social (LYC, CJT,
-    MAA, UCG, BPC -> carga; OMI -> taxi_aereo) foram incorporados as listas,
-    movendo 1.312 voos para fora de nao_classificado -- mesmo padrao de
-    evidencia ja em vigor, nao decisao nova.
+    Decisao D3 APROVADA (3a rodada, 2026-08-17): o headline do KPI 6 passa a
+    ser 'passageiros', mas a decisao NAO autorizou excluir nada da base --
+    carga, taxi aereo e nao_classificado devem seguir PRESENTES no universo,
+    disponiveis para a visao de sensibilidade ('todos os segmentos') que a
+    propria decisao exige preservar. Se algum desaparecer, alguem removeu
+    registros em vez de apenas trocar o recorte do headline. Valores
+    atualizados em 2026-08-17 (2a rodada): 6 codigos com marcador explicito
+    de segmento na razao social (LYC, CJT, MAA, UCG, BPC -> carga; OMI ->
+    taxi_aereo) foram incorporados as listas, movendo 1.312 voos para fora
+    de nao_classificado -- mesmo padrao de evidencia ja em vigor, nao decisao
+    nova.
     """
     df = pd.read_parquet(caminho_universo, columns=["segmento_operacional"])
     contagem = df["segmento_operacional"].value_counts()
     assert contagem.get("carga", 0) == 92_385
     assert contagem.get("taxi_aereo", 0) == 8_915
     assert contagem.get("nao_classificado", 0) == 151_969
+    assert contagem.get("passageiros", 0) > 0
+    assert contagem.get("passageiros_regional", 0) > 0
+
+
+def test_d3_nao_classificado_nunca_e_presumido_pax_nem_carga(caminho_universo):
+    """
+    A decisao D3 e explicita: nao_classificado NAO entra no headline
+    (passageiros) nem na visao carga+taxi aereo -- so aparece na visao
+    agregada de sensibilidade ('todos os segmentos'). Trava isso sobre os
+    valores possiveis de segmento_operacional, para que uma futura mudanca
+    nao funda essa categoria em outra silenciosamente.
+    """
+    df = pd.read_parquet(caminho_universo, columns=["segmento_operacional"])
+    valores = set(df["segmento_operacional"].dropna().unique())
+    pax = {"passageiros", "passageiros_regional"}
+    carga_taxi = {"carga", "taxi_aereo"}
+    assert "nao_classificado" in valores
+    assert "nao_classificado" not in pax
+    assert "nao_classificado" not in carga_taxi
+    assert valores == pax | carga_taxi | {"nao_classificado"}
 
 
 def test_d3_extensao_das_listas_usa_o_mesmo_padrao_de_evidencia(caminho_universo):
@@ -576,51 +636,92 @@ def test_r11_faixa_3h_nula_exatamente_onde_hora_prevista_nula(caminho_universo):
 
 def test_reconciliacao_kpi7_sobre_dados_reais(caminho_universo):
     """
-    Reproduz, sobre o artefato real, os numeros do funil documentado em
-    docs/status_projeto.md: 5.193.012 (atraso_valido) / 5.193.587 (antes de
-    corte de outlier de partida) / 145 (chegada extrema entre os validos) /
-    146 (qualquer motivo de chegada entre os validos) / 655 (chegada extrema
-    no universo inteiro). Nenhum e divergencia -- sao definicoes diferentes
-    de denominador, reconciliadas na integra.
+    Reproduz, sobre o artefato real, o funil de 4 estagios documentado em
+    docs/status_projeto.md:
+
+      [A] REALIZADO                                            5.306.208
+      [B] [A] + partida_prevista e partida_real preenchidas     5.193.587
+      [C] [B] + atraso_valido (partida dentro de 24h)           5.193.012
+      [D] [C] + chegada_individualmente_valida (elegib. KPI 7)  5.192.866
+
+    Cada estagio e SUBCONJUNTO do anterior (D subset C subset B subset A).
+    A diferenca [B]-[D] = 721 NAO e um numero solto: e a soma exata dos 3
+    motivos que podem ocorrer dentro de [B] (chegada_prevista_ausente e
+    chegada_real_ausente sao SEMPRE zero dentro de B -- um voo REALIZADO com
+    partida completa sempre tem os dois campos de chegada preenchidos, na
+    base observada):
+        655 atraso_chegada_acima_do_limite
+      +  65 partida_invalida (subconjunto dos 575 outliers de partida que
+             TAMBEM tem chegada disponivel, valida e cronologica -- por isso
+             65, nao 575: a maioria dos outliers de partida tambem tem
+             problema de chegada e e rotulada pelo motivo de chegada, que
+             vem antes na precedencia)
+      +   1 chegada_anterior_a_partida
+      = 721
     """
     df = pd.read_parquet(caminho_universo, columns=[
         "situacao_voo", "partida_prevista", "partida_real",
         "atraso_partida_min", "atraso_chegada_min", "atraso_valido",
-        "atraso_chegada_valido"])
+        "atraso_chegada_valido", "motivo_principal_invalidez_chegada"])
 
     realizado = df["situacao_voo"] == "REALIZADO"
-    tem_partida = df["partida_prevista"].notna() & df["partida_real"].notna()
-    antes_d1 = int((realizado & tem_partida).sum())
-    assert antes_d1 == 5_193_587
+    A = realizado
+    assert int(A.sum()) == 5_306_208
 
-    assert int(df["atraso_valido"].sum()) == N_ATRASO_VALIDO  # 5.193.012
-    assert antes_d1 - int(df["atraso_valido"].sum()) == 575
+    tem_partida = df["partida_prevista"].notna() & df["partida_real"].notna()
+    B = realizado & tem_partida
+    assert int(B.sum()) == 5_193_587
+
+    C = df["atraso_valido"]
+    assert int(C.sum()) == N_ATRASO_VALIDO  # 5.193.012
+    assert (C & ~B).sum() == 0, "atraso_valido tem que ser subconjunto de B"
+    assert int(B.sum()) - int(C.sum()) == 575
+
+    D = df["atraso_chegada_valido"]
+    assert int(D.sum()) == N_ATRASO_CHEGADA_VALIDO  # 5.192.866
+    assert (D & ~C).sum() == 0, "atraso_chegada_valido tem que ser subconjunto de C"
+
+    # --- definicao formal dos 146 = [C] \ [D] ---------------------------
+    # atraso_valido=True (esta em C) E chegada_individualmente_valida=False
+    # (falha em pelo menos uma das 3 condicoes de chegada). Equivalente, por
+    # construcao de atraso_chegada_valido, a "C & ~D".
+    conjunto_146 = C & ~D
+    assert int(conjunto_146.sum()) == 146
+    motivo_dos_146 = df.loc[conjunto_146, "motivo_principal_invalidez_chegada"].value_counts()
+    assert motivo_dos_146.get("atraso_chegada_acima_do_limite", 0) == 145
+    assert motivo_dos_146.get("chegada_anterior_a_partida", 0) == 1
+    assert motivo_dos_146.sum() == 146  # nenhum outro motivo aparece dentro de C
+
+    # --- decomposicao de B \ D = 721 -------------------------------------
+    conjunto_721 = B & ~D
+    assert int(conjunto_721.sum()) == 721
+    motivo_dos_721 = df.loc[conjunto_721, "motivo_principal_invalidez_chegada"].value_counts()
+    assert motivo_dos_721.get("atraso_chegada_acima_do_limite", 0) == 655
+    assert motivo_dos_721.get("partida_invalida", 0) == 65
+    assert motivo_dos_721.get("chegada_anterior_a_partida", 0) == 1
+    assert motivo_dos_721.sum() == 721  # chegada_prevista/real_ausente = 0 dentro de B
 
     extremos_no_universo = df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN
     assert int(extremos_no_universo.sum()) == 655
 
-    extremos_e_validos = int((extremos_no_universo & df["atraso_valido"]).sum())
-    assert extremos_e_validos == 145
-
-    falha_chegada_entre_validos = int(
-        (df["atraso_valido"] & ~df["atraso_chegada_valido"]).sum())
-    assert falha_chegada_entre_validos == 146
-    assert falha_chegada_entre_validos - extremos_e_validos == 1  # so a cronologica
-
-    assert int(df["atraso_chegada_valido"].sum()) == N_ATRASO_CHEGADA_VALIDO
-
 
 def test_reconciliacao_precedencia_sobre_dados_reais(caminho_universo):
     """
-    Confere, sobre o artefato real, que motivo_invalidez_chegada e sempre o
-    motivo de MAIOR precedencia entre os aplicaveis -- reproduzindo o achado
-    de que 510 registros tem |atraso_chegada|>24h E partida invalida ao mesmo
-    tempo, e sao rotulados pelo motivo de chegada, nao pelo de partida.
+    Confere, sobre o artefato real, que motivo_principal_invalidez_chegada e
+    sempre o motivo de MAIOR precedencia entre os aplicaveis -- reproduzindo
+    o achado de que 510 registros tem |atraso_chegada|>24h E partida invalida
+    ao mesmo tempo, e sao rotulados pelo motivo de chegada, nao pelo de
+    partida.
     """
     df = pd.read_parquet(caminho_universo, columns=[
-        "atraso_valido", "atraso_chegada_min", "motivo_invalidez_chegada"])
+        "atraso_valido", "atraso_chegada_min", "motivo_principal_invalidez_chegada",
+        "problema_atraso_chegada_acima_do_limite", "problema_partida_invalida"])
     duplo_problema = ((df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN)
                       & ~df["atraso_valido"])
     assert int(duplo_problema.sum()) == 510
-    assert (df.loc[duplo_problema, "motivo_invalidez_chegada"]
+    assert (df.loc[duplo_problema, "motivo_principal_invalidez_chegada"]
             == "atraso_chegada_acima_do_limite").all()
+    # as flags independentes confirmam: os 510 tem os DOIS problemas, nao so
+    # o que aparece no motivo principal
+    assert (df.loc[duplo_problema, "problema_atraso_chegada_acima_do_limite"]).all()
+    assert (df.loc[duplo_problema, "problema_partida_invalida"]).all()

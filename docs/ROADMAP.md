@@ -20,9 +20,9 @@ declarado ali é **P1, P2, P3, P6, P8, P11** e **H1–H4**.
 | **B** | Série temporal | P1, P2, KPI 6 | ✅ concluído |
 | **C** | Aeroporto vs companhia | H2, P3, P6 | ✅ concluído |
 | **D** | Concentração do impacto | H1, P2 | ✅ concluído |
-| **E** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ⬜ não iniciado |
-| **F** | Priorização | P11 | ⬜ prep. de escopo feita; implementação depende de E |
-| **G** | Visualização e dashboard | — (comunicação) | ⬜ depende de B–F |
+| **E** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ✅ concluído |
+| **F** | Priorização | P11 | ✅ concluído |
+| **G** | Visualização e dashboard | — (comunicação) | ⬜ depende de B–F (não iniciado; Power BI não iniciado por instrução explícita) |
 
 Blocos **B** e **C** foram definidos nesta auditoria (2026-08-17); antes existia
 apenas a numeração implícita dos scripts. A letra **D** foi mantida como está
@@ -73,8 +73,12 @@ Regras R1–R9, cada uma reportando quantos registros afeta:
   `hora_prevista` é hora local do aeroporto ou hora única de referência — não
   confirmado na documentação da fonte; ver `LIMITACAO_FUSO_HORARIO`.
 - ~~Não existe flag de validade para chegada.~~ **RESOLVIDO por R10** (decisão
-  D1, 2026-08-17): `chegada_valida`, `atraso_chegada_valido`,
-  `recuperacao_valida` e `motivo_invalidez_chegada`.
+  D1, 2026-08-17; terminologia corrigida em 3ª rodada): `chegada_disponivel`
+  (disponibilidade), `chegada_individualmente_valida` (validade individual),
+  `atraso_chegada_valido` (elegibilidade completa do KPI 7),
+  `recuperacao_valida`, `motivo_principal_invalidez_chegada`, 5 flags
+  `problema_*` independentes e `qtd_motivos_invalidez_chegada` — ver
+  `docs/status_projeto.md` §0.1-0.2.
 - ~~`grupo_companhia` é mapa por código, sem vigência.~~ **RESOLVIDO por R8**
   (decisão D2, corrigida em 2026-08-17): `operadora_analitica`,
   `grupo_economico` e `segmento_operacional`, resolvidos por registro —
@@ -137,37 +141,50 @@ silenciosa de um dos três números.
 
 **P6:** células abaixo de 100 voos são sinalizadas, nunca removidas do pivô.
 
-**P11 (preparação, não implementação):** distribuição de volume aeroporto ×
-`faixa_3h` calculada (1.221 células não vazias; 382 elegíveis com n≥1.000) e
-5 critérios de elegibilidade **propostos** em C.7, aguardando decisão do
-usuário antes do Bloco F.
+**P11 (preparação histórica, ver Bloco F para o ranking real):** C.7 mostra a
+distribuição de volume aeroporto × `faixa_3h` no **histórico completo**
+(1.221 células não vazias; 382 com n≥1.000) e 5 critérios propostos — mantido
+como contexto. O P11 aprovado (decisão D5) usa um **horizonte e um corte de
+célula próprios** (12 meses, `VOLUME_MINIMO_CELULA_P11=500`), não os números
+desta seção — ver Bloco F.
 
 ---
 
-## Bloco E — Dimensões e intradiário ⬜
+## Bloco E — Dimensões e intradiário ✅
+
+**Script:** `src/09_bloco_e_dimensoes_intradiario.py` · **Saída:**
+`docs/eda_bloco_e.md`
 
 **Responde:** H3 e P8 (curva ao longo do dia), H4 (aeroportos
-desproporcionais), KPI 2, KPI 3, KPI 5.
+desproporcionais), KPI 2, KPI 3, KPI 5. Horizonte: **histórico completo**
+(2019–2026), mesmo raciocínio de H2 no Bloco C — não é o ranking operacional
+de 12 meses do Bloco F.
 
-**Desbloqueado** pela decisão D4 (2026-08-17): `faixa_3h` (8 faixas de 3h) e
-`periodo_dia` (4 turnos) já existem em `regras.py`/no universo — não é mais
-necessário decidir a granularidade.
+Cinco seções: universo de cálculo (E.1), H3/P8 por `hora_prevista` (0–23h,
+granularidade máxima) e por `faixa_3h`/`periodo_dia` (E.2), H4 — razão
+share-minutos/share-voos por aeroporto (E.3), KPI 2/3/5 por 5 dimensões —
+operadora, aeroporto, `faixa_3h`, mês e célula aeroporto×`faixa_3h` — cada
+uma com o volume mínimo apropriado à sua própria população (E.4),
+interpretação em quatro níveis (E.5).
 
-**Entregar:**
+**H3 — não refutada:** taxa de atraso >15 min varia **13,76 pp** entre a
+melhor hora (5h, 5,37%) e a pior (22h, 19,13%) — muito longe de uma curva
+plana. A curva cresce ao longo do dia com uma leve queda na madrugada
+profunda (0h–5h, poucos voos, tipicamente sem acúmulo de atraso do dia
+anterior).
 
-1. Taxa de atraso > 15 min e mediana por `faixa_3h`/`periodo_dia` de partida
-   programada (H3/P8).
-2. Share de minutos de atraso **vs** share de voos por aeroporto (H4). Os
-   insumos já estão em D.5; falta o cálculo de desproporcionalidade.
-3. KPI 2 (> 30 e > 60 min), KPI 3 (mediana) e KPI 5 (minutos acumulados) por
-   todas as dimensões, respeitando o parâmetro de volume mínimo apropriado a
-   cada finalidade (`VOLUME_MINIMO_COMPANHIA`, `VOLUME_MINIMO_SERIE_MENSAL` ou
-   `VOLUME_MINIMO_AEROPORTO_FAIXA` — não reutilizar um pelo outro sem
-   evidência, ver `regras.py`).
+**H4 — não refutada:** razão (share de minutos / share de voos) entre os 116
+aeroportos com volume ≥ 1.000 varia de **0,18 a 3,94** — longe da
+proporcionalidade (~1,00) que refutaria a hipótese. SBGR, o maior aeroporto
+do universo, também é desproporcional (razão 1,24) — o achado não é apenas
+ruído de aeroportos pequenos.
 
-**Limite a declarar explicitamente:** um padrão intradiário é compatível com
-efeito cascata **e** com saturação de infraestrutura. As duas explicações não
-são separáveis sem matrícula da aeronave. O texto deve dizer isso.
+**Limite declarado, conforme o ROADMAP exigia:** o padrão intradiário (H3) é
+compatível com efeito **cascata** (atraso de uma aeronave se propaga para o
+próximo voo) **e** com **saturação de infraestrutura** (mais voos programados
+à tarde/noite saturam pista/portão/TMA). As duas explicações não são
+separáveis sem matrícula da aeronave — o bloco descreve o padrão, nunca
+escolhe entre as duas causas.
 
 ---
 
@@ -184,19 +201,32 @@ H1 confirmada: ICA5 = 56,21%, Gini = 0,8657, robusta em todos os eixos testados.
 
 ---
 
-## Bloco F — Priorização ⬜
+## Bloco F — Priorização ✅
 
-**Responde:** P11 — a entrega final. As 10 combinações aeroporto × `faixa_3h`
-com maior potencial de redução de minutos de atraso.
+**Script:** `src/08_bloco_f_priorizacao.py` · **Saída:** `docs/eda_bloco_f.md`
 
-**Depende de:** Bloco E (KPI 5 por `faixa_3h`) e da decisão do usuário sobre os
-critérios de elegibilidade propostos em C.7 (Bloco C) — para não atribuir a um
-aeroporto o que é atributo do operador, e para não rankear células com volume
-insuficiente para ser confiável.
+**Responde:** P11 — as combinações aeroporto × `faixa_3h` com maior potencial
+de redução de minutos de atraso.
 
-**Cuidado registrado em D.8:** não se pode afirmar que atuar sobre a cauda
-reduza o total na mesma proporção. A lista é de **potencial**, sob premissa
-declarada, não de economia garantida.
+**Decisão D5 (2026-08-18):** horizonte de **12 meses completos** (jul/2025 a
+jun/2026), não o histórico inteiro (que fica como contexto/teste de
+estabilidade, seção F.6). Corte de célula próprio da janela
+(`VOLUME_MINIMO_CELULA_P11 = 500`, recalculado — não reaproveita o corte do
+histórico completo). 5 critérios de elegibilidade avaliados: volume mínimo e
+cobertura de partidas válidas e meses de operação **excluem**; estabilidade
+entre subperíodos e concentração por operadora são **flags**, nunca exclusão.
+234 de 625 células elegíveis, representando 94,0% dos voos e 94,3% dos
+minutos de atraso da janela.
+
+**Sem índice composto:** dois rankings paralelos — por **impacto total**
+(minutos acumulados, a ordenação principal) e por **taxa** (OTP15, do pior
+para o melhor) — com volume, OTP15, mediana, cancelamento, participação da
+operadora principal e estabilidade lado a lado em ambos. Cancelamento nunca é
+convertido em minutos.
+
+**Cuidado registrado em F.7 (equivalente ao D.8 do Bloco D):** não se pode
+afirmar que atuar sobre a cauda reduza o total na mesma proporção. A lista é
+de **potencial**, sob premissa declarada, não de economia garantida.
 
 ---
 
@@ -222,7 +252,7 @@ parcial.
 | 2 | `matplotlib` e `duckdb` pinados sem uso | dependência morta |
 | 3 | `ano`/`mes`/`hora_prevista` como `double` | atrito em join e BI |
 | 4 | `voo_domestico` é constante `True` no universo | coluna inútil |
-| 5 | ~~`VOLUME_MINIMO_RECORTE` sem análise de sensibilidade~~ **RESOLVIDO (D4, 2026-08-17):** separado em três parâmetros por finalidade — `VOLUME_MINIMO_COMPANHIA` (50.000, comparação de companhia), `VOLUME_MINIMO_SERIE_MENSAL` (10.000, série mensal), `VOLUME_MINIMO_AEROPORTO_FAIXA` (1.000, ranking aeroporto × faixa) — cada um documentado em `regras.py` com distribuição e sensibilidade | resolvido |
+| 5 | ~~`VOLUME_MINIMO_RECORTE` sem análise de sensibilidade~~ **RESOLVIDO (D4, 2026-08-17; estendido em D5, 2026-08-18):** quatro parâmetros por finalidade — `VOLUME_MINIMO_COMPANHIA` (50.000, comparação de companhia), `VOLUME_MINIMO_SERIE_MENSAL` (10.000, série mensal), `VOLUME_MINIMO_AEROPORTO_FAIXA` (1.000, células no histórico completo — H2/Bloco E), `VOLUME_MINIMO_CELULA_P11` (500, células na janela de 12 meses do P11 — corte diferente porque o horizonte é ~7,5× mais curto) — cada um documentado em `regras.py` com distribuição e sensibilidade | resolvido |
 | 6 | `TOP_N_AEROPORTOS = 12` é regra distinta do corte de volume (daria 22 aeroportos) | comparabilidade entre tabelas |
 | 7 | Grafia duplicada `Atraso > 240` / `Atraso >240` em `situacao_partida` | só importa se o campo da fonte for usado |
 | 8 | Domínios de `codigo_di` e `codigo_tipo_linha` — consulta à GEAC/ANAC pendente | segmentação sem semântica |

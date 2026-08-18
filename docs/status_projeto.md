@@ -19,46 +19,113 @@ encontraram: (a) nenhuma divergência real no KPI 7 — apenas definições de
 denominador diferentes; (b) um **erro real** na primeira implementação de D2,
 corrigido nesta rodada.
 
-### 0.1 Reconciliação do KPI 7 — funil completo
+### 0.1 Reconciliação do KPI 7 — funil completo (corrigida na 3ª rodada)
 
-| Estágio | Filtro | Coluna usada | n | Excluídos |
+A rodada anterior apresentou o número "145 excluídos a mais" ao listar
+5.192.866 logo depois de 5.193.587, o que sugeria `5.193.587 − 5.192.866 =
+145`. **Essa conta está errada: o resultado real é 721.** O 145 pertencia a
+outra subtração (`[C] − [D]`, não `[B] − [D]`). Corrigido abaixo, com cada
+estágio expresso como subconjunto explícito do anterior.
+
+| Estágio | Filtro | Coluna usada | n | Excluídos do estágio anterior |
 |---|---|---|---|---|
 | Universo analítico | — | — | 5.452.295 | — |
-| [A] REALIZADO | `situacao_voo` | `situacao_voo` | 5.306.208 | 146.087 |
-| [B] partida completa | `partida_prevista` e `partida_real` preenchidas | idem | **5.193.587** | 112.621 |
-| [C] `atraso_valido` | `\|atraso_partida_min\| ≤ 1440` | `atraso_partida_min` | **5.193.012** | 575 |
-| [D] `atraso_chegada_valido` (base do KPI 7) | chegada completa + `\|atraso_chegada_min\| ≤ 1440` + `chegada_real ≥ partida_real` | `atraso_chegada_min`, `chegada_real`, `partida_real` | **5.192.866** | 146 |
+| [A] REALIZADO | `situacao_voo == "REALIZADO"` | `situacao_voo` | 5.306.208 | 146.087 |
+| [B] + partida completa | `partida_prevista` e `partida_real` preenchidas | idem | **5.193.587** | 112.621 |
+| [C] + `atraso_valido` | `\|atraso_partida_min\| ≤ 1440` | `atraso_partida_min` | **5.193.012** | 575 |
+| [D] + `chegada_individualmente_valida` (= base do KPI 7, via `atraso_chegada_valido`) | chegada disponível + `\|atraso_chegada_min\| ≤ 1440` + `chegada_real ≥ partida_real` | `atraso_chegada_min`, `chegada_real`, `partida_real` | **5.192.866** | 146 |
 
-**Os números do relatório anterior eram todos corretos — nenhum foi
-recalculado.** O que causava a aparência de divergência era comparar estágios
-diferentes do mesmo funil, ou universos diferentes:
+Cada estágio é **subconjunto exato** do anterior ([D] ⊂ [C] ⊂ [B] ⊂ [A]) —
+verificado por teste, não assumido.
 
-| Número citado | O que realmente é |
+**Definição formal do conjunto de 146 registros ([C] \ [D]):**
+
+```
+conjunto_146 = atraso_valido == True  AND  chegada_individualmente_valida == False
+```
+
+isto é: partida dentro do universo de cálculo (`atraso_valido=True`), mas a
+chegada falha em pelo menos uma das 3 condições de `chegada_individualmente_
+valida` (disponibilidade, limite de 24h, coerência cronológica). Decompõe-se,
+pelo motivo principal, em:
+
+| Motivo principal | n |
 |---|---|
-| 5.193.012 | Estágio [C] — `atraso_valido`, filtro **só de partida** |
-| 5.193.587 | Estágio [B] — **antes** do corte de outlier de partida (575 a mais que [C]) |
-| 145 | `atraso_valido=True` **E** `\|atraso_chegada\|>24h` — interseção de duas condições |
-| 146 | `atraso_valido=True` **E** qualquer motivo de chegada inválida = 145 (magnitude) + 1 (só cronológica) |
-| 655 | `\|atraso_chegada\|>24h` em **todo o universo**, independente de `atraso_valido` |
+| `atraso_chegada_acima_do_limite` | 145 |
+| `chegada_anterior_a_partida` | 1 |
+| **total** | **146** |
 
-Verificado byte a byte sobre o artefato real: `test_reconciliacao_kpi7_sobre_dados_reais`.
+**Decomposição de `[B] − [D] = 721`** (a subtração que a rodada anterior
+tentou fazer e errou): dentro de [B] (REALIZADO + partida completa), só 3 dos
+5 motivos possíveis ocorrem — `chegada_prevista_ausente` e `chegada_real_
+ausente` são **zero** dentro de [B], porque, na base observada, todo voo
+REALIZADO com partida completa também tem os dois campos de chegada
+preenchidos:
 
-### 0.2 Precedência de `motivo_invalidez_chegada` — confirmada como ocultando problemas múltiplos
+| Motivo principal | n |
+|---|---|
+| `atraso_chegada_acima_do_limite` | 655 |
+| `partida_invalida` | 65 |
+| `chegada_anterior_a_partida` | 1 |
+| **total** | **721** |
+
+O `partida_invalida` aqui é **65, não 575**: dos 575 outliers de partida que
+existem no universo inteiro, a maioria também tem problema de chegada e é
+rotulada pelo motivo de chegada (que vem antes na ordem de precedência) —
+só 65 outliers de partida têm chegada disponível, dentro do limite e
+cronológica, e por isso "sobram" para o motivo `partida_invalida`.
+
+**Terminologia corrigida.** A rodada anterior também usou "chegada
+registrada" e `chegada_valida` como sinônimos — não são. Três conceitos
+agora têm nomes próprios e não intercambiáveis:
+
+| Conceito | Coluna | Definição |
+|---|---|---|
+| Disponibilidade | `chegada_disponivel` | `chegada_prevista` e `chegada_real` preenchidas — nada além disso |
+| Validade individual da chegada | `chegada_individualmente_valida` | disponível **e** dentro de 24h **e** cronologicamente coerente — independe da partida |
+| Elegibilidade completa do KPI 7 | `atraso_chegada_valido` | `atraso_valido` (partida) **e** `chegada_individualmente_valida` |
+
+`motivo_invalidez_chegada` foi renomeado para `motivo_principal_
+invalidez_chegada`, para deixar explícito que é **um** motivo (o de maior
+precedência), não o único problema do registro — ver §0.2.
+
+Todos os números acima (5.306.208 / 5.193.587 / 5.193.012 / 5.192.866 / 146 /
+721 / 655 / 65 / 1 / 145) verificados byte a byte sobre o artefato real em
+`test_reconciliacao_kpi7_sobre_dados_reais`.
+
+### 0.2 Precedência de `motivo_principal_invalidez_chegada` — confirmada como ocultando problemas múltiplos, agora com flags independentes
 
 O usuário pediu para confirmar se "motivo único" no campo esconde registros
-com mais de um problema. **Confirmado que sim, por desenho:**
+com mais de um problema. **Confirmado que sim, por desenho** — e, nesta
+rodada, isso deixou de depender só do motivo único: 5 flags booleanas
+independentes (`problema_chegada_prevista_ausente`, `problema_chegada_real_
+ausente`, `problema_chegada_anterior_a_partida`, `problema_atraso_chegada_
+acima_do_limite`, `problema_partida_invalida`) registram cada condição
+isoladamente, mais uma contagem `qtd_motivos_invalidez_chegada` (0 a 5):
+
+| Motivos aplicáveis simultaneamente | Registros |
+|---|---|
+| 0 (elegível) | 5.192.866 |
+| 1 | 211 |
+| 2 | 259.216 |
+| 3 | 2 |
 
 - 259.218 dos 259.429 registros inválidos têm **2 ou mais** motivos
   tecnicamente aplicáveis simultaneamente;
 - exemplo concreto: **510 registros** têm ao mesmo tempo `\|atraso_chegada\|>24h`
   **e** partida inválida (não-REALIZADO ou outlier de partida) — todos os 510
   são rotulados `atraso_chegada_acima_do_limite`, nunca `partida_invalida`,
-  porque a checagem de chegada vem antes na ordem de precedência;
+  porque a checagem de chegada vem antes na ordem de precedência. As duas
+  flags independentes (`problema_atraso_chegada_acima_do_limite` e
+  `problema_partida_invalida`) confirmam que ambas são `True` para os 510,
+  mesmo que o motivo principal mostre só uma;
 - verificado: **0 divergências** entre o motivo esperado pela ordem declarada
-  em `MOTIVOS_INVALIDEZ_CHEGADA` e o motivo efetivamente gravado.
+  em `MOTIVOS_INVALIDEZ_CHEGADA` e o motivo efetivamente gravado, e a soma
+  das 5 flags bate exatamente com `qtd_motivos_invalidez_chegada` em 100%
+  dos 5.452.295 registros.
 
 A regra D1 **não mudou** por causa desta reconciliação — nenhuma divergência
-encontrada exigia correção de regra, só de explicação.
+encontrada exigia correção de regra, só de explicação e de nomenclatura.
 
 ### 0.3 D2 — erro real encontrado e corrigido: resolução por mês, não por registro
 
@@ -173,18 +240,26 @@ cronológica. O KPI 7 usa somente registros com partida **e** chegada válidas.
 Inválidos preservados com motivo registrado. Sensibilidade de 6 h mantida.
 
 **Implementação:** `regras.py` (parâmetros) + `04_universo.py` R10 (aplicação).
-Quatro campos novos: `chegada_valida`, `atraso_chegada_valido`,
-`recuperacao_valida`, `motivo_invalidez_chegada`.
+Terminologia corrigida na 3ª rodada (ver §0.1): três conceitos com nomes
+próprios — `chegada_disponivel` (disponibilidade), `chegada_
+individualmente_valida` (validade individual, renomeado do antigo
+`chegada_valida`) e `atraso_chegada_valido` (elegibilidade completa do
+KPI 7). Mais `recuperacao_valida` (alias de `atraso_chegada_valido`),
+`motivo_principal_invalidez_chegada` (renomeado de `motivo_invalidez_
+chegada`), 5 flags independentes `problema_*` e `qtd_motivos_invalidez_
+chegada` — ver §0.2.
 
 **Resultado medido (universo completo, 5.452.295 registros):**
 
 | | |
 |---|---|
-| `chegada_valida` | 5.192.931 |
+| `chegada_disponivel` | 5.193.587 |
+| `chegada_individualmente_valida` | 5.192.931 |
 | **`atraso_chegada_valido` — base do KPI 7** | **5.192.866 (95,24%)** |
 | Excluídos | 259.429 — conferência fecha exatamente |
 
-Motivos de exclusão, um por registro, sem sobreposição:
+Motivo **principal** de exclusão, um por registro, sem sobreposição (mas ver
+§0.2: sobreposição real existe, só não aparece aqui):
 
 | Motivo | Registros | % |
 |---|---|---|
@@ -196,7 +271,8 @@ Motivos de exclusão, um por registro, sem sobreposição:
 
 `partida_invalida` aparece só 65 vezes porque a maioria dos registros com
 partida inválida também não tem chegada, e recebe um motivo de precedência
-anterior. Isso é a ordem de precedência funcionando, não subcontagem.
+anterior. Isso é a ordem de precedência funcionando, não subcontagem — ver a
+decomposição completa de `[B]-[D]=721` em §0.1.
 
 **Impacto sobre o KPI 7 (validado em contagem, mediana, média, soma e extremos):**
 
@@ -267,7 +343,7 @@ nada; agora exclui `Two Taxi Aereo` (operadora, 20.408 voos com `atraso_valido`)
 e `Independente` (grupo, mesmo total) das tabelas de robustez. Está declarado
 nos relatórios que aplicam o corte.
 
-### D3 — Escopo de operador ⏳ PENDENTE — afeta a interpretação de "Outros" e do KPI 6
+### D3 — Escopo de operador ✅ APROVADA (2026-08-17, 3ª rodada) — headline do KPI 6
 
 **Fato.** O universo mistura três naturezas de operação numa análise cuja
 narrativa de negócio é a **experiência do passageiro**. Voo de carga não tem
@@ -351,20 +427,41 @@ Efeito agregado, medido em B.7:
 | KPI 6 | 2,71% | 2,52% | **−0,19 pp** |
 | OTP15 | 85,93% | 86,30% | +0,37 pp |
 
-**Estado atual da implementação:** o campo `segmento_operacional` **já existe**
-(criado como requisito da D2) e classifica os 5.452.295 registros. Ele é
-**puramente descritivo — não filtra nenhuma análise.** As séries do Bloco B
-cobrem o universo completo, com a variante somente-passageiros reportada ao lado
-em B.7. Nada foi pré-decidido — guardado por
-`test_d3_segmento_nao_filtra_nada_ainda`.
+**Decisão (opção A, aprovada):** o **headline** do KPI 6 passa a ser *"taxa de
+cancelamento das operações domésticas regulares de passageiros com segmento
+validado"* (`segmento_operacional` em `{passageiros, passageiros_regional}`).
+**Nenhum registro foi removido** — `segmento_operacional` continua existindo
+para 100% do universo, e o Bloco B agora publica **4 visões lado a lado**
+(seção KPI6.0 de `eda_bloco_b.md`), cada uma com numerador, denominador, taxa,
+cobertura da classificação e a quantidade/participação de `nao_classificado`:
 
-**Alternativas:**
+| Visão | Numerador | Denominador | Taxa | Cobertura |
+|---|---|---|---|---|
+| **[headline] passageiros** | 121.900 | 5.106.720 | **2,39%** | 95,66% |
+| carga + táxi aéreo | 9.490 | 88.415 | 10,73% | 1,66% |
+| não classificado | 13.388 | 143.230 | 9,35% | 2,68% |
+| todos os segmentos (sensibilidade) | 144.778 | 5.338.365 | 2,71% | 100,00% |
 
-| | Opção | Efeito |
+`nao_classificado` **não é presumido** passageiro nem carga — fica de fora do
+headline e de "carga + táxi aéreo", só aparece na visão agregada de
+sensibilidade, que a decisão exige **preservar**, não substituir. `NÃO
+INFORMADO` (1.307 registros, 0,024% do universo) segue fora do denominador em
+todas as 4 visões, pela regra já em vigor desde a 1ª rodada — sem desfecho
+declarado não se pode afirmar nem cancelamento nem realização.
+
+O headline também passou a valer para as séries por ano (KPI6.a), por regime
+(KPI6.b), por operadora (KPI6.c, com a tabela "todos os segmentos" ao lado
+como sensibilidade explícita) e para os piores meses (KPI6.d) — todas em
+`eda_bloco_b.md`, seção B.6. Guardado por
+`test_d3_segmento_permanece_atributo_descritivo_apos_aprovacao` e
+`test_d3_nao_classificado_nunca_e_presumido_pax_nem_carga`.
+
+**Opções descartadas:**
+
+| | Opção | Por que não |
 |---|---|---|
-| **A** *(recomendada)* | Passageiros passa a ser o **recorte principal** de todas as métricas; carga e táxi aéreo viram recortes próprios | nenhum registro removido; KPI 6 deixa de misturar fenômenos |
-| **B** | Manter universo completo como principal e declarar a limitação | zero trabalho; KPI 6 agregado segue enganoso |
-| **C** | Excluir carga e táxi aéreo do universo | **não recomendado** — contraria o princípio de marcar em vez de remover e invalidaria o funil R1–R11 |
+| B | Manter universo completo como headline, só declarar a limitação | zero trabalho, mas o KPI 6 principal seguiria enganoso — decisão do usuário foi corrigir o headline, não só documentar o problema |
+| C | Excluir carga e táxi aéreo do universo | contraria o princípio de marcar em vez de remover e invalidaria o funil R1–R11 |
 
 > **Limite da classificação, registrado:** `segmento_operacional` foi derivado da
 > **razão social** na fonte, **não** de campo oficial da ANAC. O
@@ -458,24 +555,79 @@ explicitamente tendência temporal, autocorrelação, sazonalidade compartilhada
 e mudança de composição da malha como explicações alternativas não
 descartadas, ao lado do confundidor da pandemia.
 
+### D5 — Horizonte e elegibilidade do P11 ✅ APROVADA (2026-08-18)
+
+**Decisão:** o ranking operacional principal (P11) usa os **últimos 12 meses
+completos** disponíveis — **julho/2025 a junho/2026** — não o histórico
+inteiro. 2019–2026 continua disponível como contexto histórico e teste de
+estabilidade (Bloco B, Bloco C), nunca como base do ranking. Os 12 meses da
+janela são individualmente completos; 2026 ser "ano parcial" (R9) é uma
+afirmação sobre o calendário anual, não sobre os meses fechados que a janela
+móvel cobre — as duas coisas não se contradizem.
+
+**Recorte de célula recalculado para a janela** (não reaproveitado do
+histórico completo): a janela tem 788.851 voos com `atraso_valido`, 145
+aeroportos, 625 células aeroporto×`faixa_3h` não vazias — menos da metade das
+1.221 do histórico completo, porque a janela é ~7,5× mais curta. Reusar
+`VOLUME_MINIMO_AEROPORTO_FAIXA=1.000` (estudado sobre o histórico) deixaria de
+fora 12,7% do volume da janela (contra 3,0% no histórico) — corte escolhido
+para a janela: **`VOLUME_MINIMO_CELULA_P11 = 500`**, cobrindo 94,0% do volume
+com margem de erro aproximada de ±3,1 pp (contra ±2,2 pp do corte de 1.000).
+Distribuição e sensibilidade completas em `src/regras.py`.
+
+**Os 5 critérios de elegibilidade avaliados, medidos sobre as 234 células que
+passam o corte de volume:**
+
+| # | Critério | Distribuição medida | Resultado |
+|---|---|---|---|
+| 1 | Volume mínimo da célula | ver acima | **234 de 625** células (37,4%) elegíveis |
+| 2 | Cobertura de partidas válidas (`atraso_valido`/REALIZADO) | média 99,997%, mínimo 99,56% | **não restringe nada** — nenhuma célula com volume ≥ 500 tem cobertura < 95% |
+| 3 | Meses com operação (de 12) | 232 células com 12/12; 2 com 11/12 | **não restringe nada** num piso de 10 meses |
+| 4 | \|Δ OTP15\| entre subperíodos (H1 jul–dez/25 vs H2 jan–jun/26) | média 2,65 pp; mediana 2,04 pp; máx 15,7 pp | **FLAG** (não exclusão) acima de 10 pp — 6 de 234 células |
+| 5 | Participação da maior operadora na célula | média 55,9%; mediana 53,1%; máx 99,1% | **FLAG** (não exclusão) acima de 80% — 18 de 234 células |
+
+Critérios 2 e 3 foram avaliados e **mantidos como guarda explícita**, mas na
+prática não excluem nenhuma célula hoje — o corte de volume (critério 1) já
+é suficiente para garantir dado íntegro e operação recorrente nas 234 células
+que passam. Critérios 4 e 5 são **flags analíticas visíveis na tabela do
+ranking, nunca motivo de exclusão** — uma célula instável ou dominada por uma
+operadora pode ainda ser a maior prioridade em minutos acumulados; a decisão
+foi sinalizar, não descartar.
+
+**O que as 234 células elegíveis representam** (sobre a janela de 12 meses):
+
+| Métrica | Elegíveis | Total da janela | % |
+|---|---|---|---|
+| Voos (`atraso_valido`) | 741.667 | 788.851 | **94,0%** |
+| Minutos de atraso (impacto positivo) | 6.809.647 | 7.217.569 | **94,3%** |
+| Cancelamentos (REALIZADO+CANCELADO) | 12.286 | 14.537 | **84,5%** |
+| Aeroportos | 54 | 145 | 37,2% |
+| Cobertura mensal | 232/234 com 12/12 meses; 2 com 11/12 | — | — |
+
+O corte de volume exclui 391 células de baixo movimento (a maioria delas de
+poucos aeroportos pequenos em faixas de baixa demanda), mas preserva 94% do
+volume e do impacto em minutos — a métrica que o ranking usa como ordenação
+principal (ver §6). A cobertura de cancelamentos é mais baixa (84,5%) porque
+células pequenas concentram desproporcionalmente cancelamentos raros e
+irregulares — informação registrada, não escondida.
+
 ---
 
 ## 4. Riscos remanescentes
 
 | # | Risco | Severidade | Nota |
 |---|---|---|---|
-| 1 | **D3 aberta:** KPI 6 agregado mistura passageiros (1,99%), carga (9,65%) e táxi aéreo (24,06%) | **alta** | já implementado no Bloco B; ler B.7 antes de citar a taxa agregada |
-| 2 | `nao_classificado` (151.969 voos, 2,79%) cancela a 9,35%, dominado por 4 códigos (PTB/PAM/ONE/IPM, 96,11%) — companhias de passageiros conhecidas fora da fonte, não classificadas por falta de marcador textual | média | subproduto da D3; sugestão registrada, nenhuma classificação foi inventada |
-| 3 | `VOLUME_MINIMO_AEROPORTO_FAIXA=1.000` é proposta com evidência, não decisão de negócio fechada | média | ver §7 e D4.1; revisitável quando P11 for implementado |
+| 1 | `nao_classificado` (151.969 voos, 2,79%) cancela a 9,35%, dominado por 4 códigos (PTB/PAM/ONE/IPM, 96,11%) — companhias de passageiros conhecidas fora da fonte, não classificadas por falta de marcador textual; ficam fora do headline do KPI 6 (D3) até validação | média | sugestão registrada, nenhuma classificação foi inventada — ver §D3 |
+| 3 | ~~`VOLUME_MINIMO_AEROPORTO_FAIXA=1.000` proposta sem decisão fechada~~ **RESOLVIDO (D5):** segue em vigor para H2/Bloco E (histórico completo); o P11 tem corte próprio (`VOLUME_MINIMO_CELULA_P11=500`) recalculado para a janela de 12 meses | baixa | ver §D5 |
 | 4 | Horário local por aeroporto **não confirmado** pela ANAC | média | D4; evidência empírica favorável, não documental; afeta comparação de `faixa_3h`/`periodo_dia` **entre** aeroportos de fusos diferentes |
 | 5 | `ano`/`mes`/`dia_semana`/`hora_prevista` são `double` (112.623 registros sem data) | média | atrito em join e Power BI |
 | 6 | 112.623 registros sem `partida_prevista` (2,07%) | média | ficam fora de toda série temporal e de `faixa_3h`/`periodo_dia` por construção |
-| 7 | Sem orquestração (`run_all`/Makefile) | média | 6 scripts em ordem por convenção de nome |
+| 7 | Sem orquestração (`run_all`/Makefile) | média | 9 scripts em ordem por convenção de nome (04–09, mais 01–03 de ingestão) |
 | 8 | Fronteira de vigência OWT fixada em 2021-06-01, mês misto na fonte | baixa | resolvida por REGISTRO desde a 2a rodada (não mais por mês); a fronteira só resta como fallback para os poucos registros sem razão social reconhecida |
 | 9 | Vigência datada pela razão social = limite **superior** do evento societário | baixa | registrado; a dimensão afirma vigência de nome, não de aquisição |
 | 10 | H6 (sazonalidade) não testada | baixa | B.4.d descreve o mês médio, não testa recorrência entre anos |
 | 11 | `matplotlib` e `duckdb` pinados sem uso | baixa | dependência morta |
-| 12 | KPIs 2, 3 e 5 definidos e não implementados por dimensão | baixa | Bloco E (ver §7 e `ROADMAP.md`) |
+| 12 | ~~KPIs 2, 3 e 5 definidos e não implementados por dimensão~~ **RESOLVIDO:** implementados no Bloco E, por operadora/aeroporto/`faixa_3h`/mês/célula | — | `docs/eda_bloco_e.md` |
 
 Os dois riscos de severidade alta da rodada anterior (chegada sem regra de
 validade; operadora e grupo econômico no mesmo campo) foram **eliminados**
@@ -499,59 +651,65 @@ corrigido pela resolução por registro (§0.3) e também sai da lista.
 ## 6. Testes
 
 ```
-141 testes · 141 passed · 0 failed · ~30 s
+151 testes · 151 passed · 0 failed · ~28 s
 ```
 
 | Arquivo | Testes | Escopo |
 |---|---|---|
-| `tests/test_regras.py` | 81 | trava de regressão de todos os parâmetros; dimensão de companhia (vigência, evidência, resolução por registro, junho/2021); regras de D1; regimes do Bloco B (renomeados, sem "pandemia"); `faixa_3h`/`periodo_dia` (R11); reconciliação do funil do KPI 7 com dados sintéticos |
+| `tests/test_regras.py` | 82 | trava de regressão de todos os parâmetros; dimensão de companhia (vigência, evidência, resolução por registro, junho/2021); regras de D1 (funil e terminologia); regimes do Bloco B (renomeados, sem "pandemia"); `faixa_3h`/`periodo_dia` (R11); horizonte e corte de célula do P11 (D5) |
 | `tests/test_concentracao.py` | 14 | `share_topo` e `gini`: normais, nulos, vazios, soma negativa, extremos |
-| `tests/test_contrato_dados.py` | 40 | esquema, unicidade de chave, cronologia de partida **e de chegada**, flags anuláveis, motivo de invalidez exaustivo, denominadores, colunas originais, estabilidade do ICA5, janela YTD, resolução de companhia por registro sobre dados reais, `faixa_3h`/`periodo_dia` sobre dados reais, reconciliação do KPI 7 sobre dados reais |
-| `tests/test_bloco_c.py` | 6 | `otp15`, decomposição de variância (cenário aeroporto-dominante e operador-dominante, sensibilidade ao volume mínimo de célula) — sintético; o Bloco C ainda não tem teste de contrato travando os números reais (0,40 / 1,66 / 1,97) |
+| `tests/test_contrato_dados.py` | 42 | esquema (incluindo as colunas novas de R10 e o headline do KPI 6), unicidade de chave, cronologia de partida **e de chegada**, disponibilidade/validade individual/elegibilidade completa (3 conceitos separados), motivo principal + 5 flags independentes + contagem de motivos aplicáveis, reconciliação do funil do KPI 7 com a decomposição exata de 721 e 146, colunas originais, estabilidade do ICA5, janela YTD, D3 (segmento nunca presumido) |
+| `tests/test_bloco_c.py` | 6 | `otp15`, decomposição de variância (cenário aeroporto-dominante e operador-dominante, sensibilidade ao volume mínimo de célula) — sintético |
+| `tests/test_bloco_f.py` | 4 | reproduz, de forma independente do script, a elegibilidade (234/625), a representatividade (94,0%/94,3%/84,5%/54 aeroportos), as flags de instabilidade/concentração (6/18) e a não-identidade entre os dois rankings — tudo sobre dados reais |
+| `tests/test_bloco_e.py` | 3 | reproduz a amplitude de H3 (13,76 pp), a distribuição de razão de H4 (0,18–3,94, incluindo SBGR > 1) e a consistência do corte histórico de célula entre Bloco C e Bloco E — sobre dados reais |
 
 Os testes de contrato leem **metadados** do Parquet quando possível e colunas
 específicas quando não; nunca a base inteira. São pulados automaticamente se
 `data/processed/voos.parquet` não existir, para que o repositório seja testável
 após um clone sem os 3,6 GB de dados.
 
-**Não há mais nenhum `xfail`.** Nesta rodada, dois testes que travavam a
-implementação por registro foram adicionados sobre dados reais
-(`test_d2_junho_2021_real_nao_tem_mais_misclassificacao`,
-`test_reconciliacao_kpi7_sobre_dados_reais`,
-`test_reconciliacao_precedencia_sobre_dados_reais`) — nenhum decidiu nada
-silenciosamente; todos travam decisões já aprovadas (D1, D2).
+**Não há nenhum `xfail`.** Todas as decisões (D1–D5) estão implementadas e
+travadas por teste sobre dados reais, não apenas sintéticos.
 
-Guarda ainda ativa de decisão pendente:
+Guarda ainda ativa (sub-decisão dentro de D3, já aprovada):
 
-- `test_d3_segmento_nao_filtra_nada_ainda` — falha se alguém aplicar a D3 sem
-  registrar a decisão (verifica que carga = 92.385, táxi aéreo = 8.915 e
-  não-classificado = 151.969 seguem presentes no universo, valores já
-  refletindo a extensão de 6 códigos feita nesta rodada — ver §D3).
+- `test_d3_segmento_permanece_atributo_descritivo_apos_aprovacao` e
+  `test_d3_nao_classificado_nunca_e_presumido_pax_nem_carga` — falham se
+  alguém excluir carga/táxi aéreo da base, ou presumir `nao_classificado`
+  como passageiro/carga sem evidência verificável. Os 151.969 registros
+  `nao_classificado` (4 códigos dominantes: PTB/PAM/ONE/IPM) seguem
+  aguardando validação para eventual reclassificação — isso é uma auditoria
+  aberta, não uma decisão de negócio pendente.
 
 ---
 
 ## 7. Próxima etapa recomendada
 
-1. **Decidir D3.** É a única decisão aberta. Tem consequência imediata: o
-   KPI 6 já está publicado no Bloco B misturando segmentos que cancelam a
-   1,99% (passageiros), 9,64% (carga) e 24,06% (táxi aéreo); e os
-   151.969 registros `nao_classificado` seguem explícitos, sem reclassificação
-   por falta de evidência verificável (ver §D3 e a auditoria de Pareto).
-2. **Bloco E** (antes chamado "Bloco C" no roadmap; renomeado nesta rodada —
-   ver `ROADMAP.md`) — usar `faixa_3h`/`periodo_dia`, já implementados (D4),
-   para responder H3, H4, P8 e os KPIs 2, 3 e 5.
-3. **Bloco F (P11)** — antes de implementar o ranking, decidir os critérios de
-   elegibilidade propostos em `docs/eda_bloco_c.md` (seção C.7): volume mínimo
-   por célula, tratamento de células concentradas num único operador, e se o
-   ranking deve ser por operadora ou agregado por aeroporto.
-4. **Bloco G** (figuras e dashboard) — só depois de E e F. **Power BI
-   permanece não iniciado**, por instrução explícita.
+Todas as decisões de negócio identificadas até aqui (D1–D5) estão **aprovadas
+e implementadas**. Não há decisão bloqueante pendente. O que resta é:
 
-O que já foi entregue nesta rodada e não precisa de nova decisão: reconciliação
-do KPI 7 (§0.1–0.2), correção da vigência OWT/ACN por registro (§0.3, D2),
-renomeação dos regimes de malha (D4.2), `faixa_3h`/`periodo_dia` (D4),
-separação dos três parâmetros de volume mínimo (D4.1), auditoria e extensão
-evidenciada de `nao_classificado` (D3, parcial), e o **Bloco C — aeroporto vs
-companhia** completo (H2/P3/P6), incluindo a preparação de escopo para P11.
+1. **Validar (opcional, não bloqueante) a reclassificação de PTB/PAM/ONE/IPM**
+   em `nao_classificado` — são companhias de passageiros conhecidas fora da
+   fonte, mas sem marcador textual na razão social (ver §D3). Enquanto isso,
+   permanecem `nao_classificado`, fora do headline do KPI 6, sem prejuízo
+   para nenhuma análise já publicada.
+2. **Bloco G** (figuras e dashboard) — próximo bloco pendente no ROADMAP.
+   **Power BI permanece não iniciado**, por instrução explícita.
+3. **Extensões futuras já registradas, não bloqueantes:** H5 (rotas com
+   desempenho inferior controlando aeroporto/operador), H6 (sazonalidade
+   recorrente entre anos), H7/H8 (recuperação em voo por companhia,
+   correlação volume×pontualidade por aeroporto) — nenhuma faz parte do
+   núcleo de execução (P1/P2/P3/P6/P8/P11, H1–H4), todas já mencionadas como
+   "não testado aqui" nos blocos correspondentes.
+
+Entregue nesta rodada (3ª): reconciliação completa e corrigida do funil do
+KPI 7 com terminologia própria para disponibilidade/validade/elegibilidade
+(§0.1–0.2), headline do KPI 6 aprovado (D3, §D3), horizonte e elegibilidade
+do P11 recalculados para 12 meses (D5, §D5), **Bloco C** com documentação
+metodológica completa de H2 (numerador/denominador/método/ponderação/unidade
+de análise/tratamento de células pequenas/horizonte, todos os 3 escopos como
+sensibilidade), **Bloco F** — P11 implementado com 2 rankings paralelos sem
+índice composto — e **Bloco E** — H3/H4/P8/KPI2/3/5 implementados, ambas as
+hipóteses não refutadas pelos critérios do case.
 
 Detalhamento em [`ROADMAP.md`](ROADMAP.md).

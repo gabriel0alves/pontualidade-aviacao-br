@@ -37,11 +37,58 @@ C.2 — H2: DECOMPOSICAO DE VARIANCIA (aeroporto vs companhia)
 ==========================================================================
 Hipotese H2: a variacao de pontualidade esta mais associada ao
 aeroporto do que a companhia.
-Metodo: media de OTP15 por celula (aeroporto, grupo),
-n >= 1,000 (mesma logica de VOLUME_MINIMO_AEROPORTO_FAIXA).
+
+--- C.2.0  DEFINICAO METODOLOGICA (vale para as 3 variantes a seguir) ---
+UNIDADE DE ANALISE: uma CELULA = par (icao_origem, coluna de grupo),
+nunca o voo individual. O voo entra so para calcular a media da celula.
+
+NUMERADOR e DENOMINADOR da razao final:
+  numerador   = var_aeroporto_dentro_grupo = variancia das medias de
+                OTP15 ENTRE AEROPORTOS, calculada separadamente DENTRO
+                de cada grupo (operadora ou grupo economico) e depois
+                agregada entre grupos.
+  denominador = var_grupo_dentro_aeroporto = variancia das medias de
+                OTP15 ENTRE GRUPOS, calculada separadamente DENTRO de
+                cada aeroporto e depois agregada entre aeroportos.
+  razao = numerador / denominador. > 1 = a media de OTP15 varia MAIS
+  entre aeroportos (dentro de um grupo fixo) do que entre grupos (dentro
+  de um aeroporto fixo) -- e o inverso para < 1. NAO e um teste de
+  hipotese com p-valor; e uma razao de duas variancias descritivas.
+
+METODO DE DECOMPOSICAO: NAO e ANOVA de dois fatores com termo de
+interacao (exigiria scipy/statsmodels, fora das dependencias do
+projeto). E uma decomposicao mais simples e mais transparente:
+  1. celula = media de OTP15 por (icao_origem, grupo), com n >= 1,000;
+  2. dentro de cada aeroporto com >=2 grupos na celula, variancia
+     POPULACIONAL (ddof=0) das medias de grupo;
+  3. espelhado: dentro de cada grupo com >=2 aeroportos, variancia
+     populacional das medias de aeroporto.
+
+PONDERACAO: a variancia de cada aeroporto (passo 2) e cada grupo (passo
+3) entra numa media PONDERADA PELO VOLUME (soma de n das celulas que a
+formam) -- um aeroporto com 500 voos pesa menos que um com 50.000 na
+media final. Sem essa ponderacao, aeroportos/operadoras pequenas (mais
+ruidosas) distorceriam a comparacao tanto quanto as grandes.
+
+TRATAMENTO DE CELULAS PEQUENAS: celula com n < 1,000 e EXCLUIDA
+da decomposicao (nao apenas ponderada a zero) -- mesmo raciocinio de
+VOLUME_MINIMO_AEROPORTO_FAIXA: abaixo desse volume, a media da celula e
+ruido de amostragem, nao sinal. Aeroporto/grupo que sobra com so 1
+celula comparavel tambem e excluido do respectivo termo de variancia
+(precisa de >=2 para ter variancia definida).
+
+HORIZONTE TEMPORAL: HISTORICO COMPLETO (2019-2026), NAO a janela de 12
+meses do P11 (decisao D5) -- H2 e uma pergunta estrutural sobre a malha,
+nao um ranking operacional recente; usar o maximo de dado disponivel
+reduz ruido na estimativa de variancia. Nao testado aqui: se a razao se
+mantem estavel dentro so dos ultimos 12 meses (extensao futura).
+
 Compara a variancia ENTRE GRUPOS dentro do mesmo aeroporto com a
 variancia ENTRE AEROPORTOS dentro do mesmo grupo. Razao > 1 e
-compativel com H2 (aeroporto pesa mais); razao < 1 refuta H2.
+compativel com H2 (aeroporto pesa mais); razao < 1 refuta H2. O
+resultado depende do ESCOPO (quais operadoras entram) -- ver as 3
+variantes abaixo e a sintese ao final desta secao, que trata isso como
+SENSIBILIDADE DE ESCOPO, nao como uma conclusao unica.
 
 --- C.2.a  TODAS as operadoras (inclui 'Outros', heterogeneo -- D3) ---
   celulas (n>=1,000)              : 254
@@ -512,15 +559,19 @@ C.6 — INTERPRETACAO EM QUATRO NIVEIS
     a partir do fim da tarde, em todos os 12 aeroportos.
 
 [2] O QUE PODEMOS INTERPRETAR (leitura defensavel)
-  - Restrita aos tres grandes operadores de passageiros, a variacao de
-    pontualidade associa-se mais ao AEROPORTO do que a operadora --
-    leitura compativel com H2 nesse escopo.
-  - A inclusao de 'Outros' inverte essa leitura, o que e evidencia
+  - H2 NAO tem uma resposta unica -- tem uma resposta CONDICIONAL AO
+    ESCOPO, e essa condicionalidade e o proprio achado, nao um defeito
+    do metodo: incluindo 'Outros' (heterogeneo, D3 pendente), a razao e
+    0.40 (operadora varia mais); restrito a Azul/LATAM/GOL,
+    1.66 por operadora e 1.97 por grupo economico
+    (aeroporto varia mais nos dois). NENHUMA das tres e 'a resposta' --
+    sao tres medidas legitimas de escopos diferentes.
+  - A inclusao de 'Outros' muda a direcao da razao, o que e evidencia
     ADICIONAL de que D3 (segmentacao de operador) precisa ser resolvida
     antes de qualquer afirmacao ampla sobre H2.
-  - Operadora e grupo economico apontam a MESMA direcao na sensibilidade
-    (C.2.c), o que reforca a leitura de C.2.b -- a magnitude e ate um
-    pouco maior com grupo economico, o que nao enfraquece a leitura.
+  - Operadora e grupo economico apontam a MESMA direcao dentro do
+    escopo Azul/LATAM/GOL (C.2.c) -- a magnitude e um pouco maior com
+    grupo economico, mas isso NAO torna uma das duas 'a' resposta.
 
 [3] O QUE CONTINUA SENDO HIPOTESE (nao testado aqui)
   - QUE MECANISMO explica a associacao com aeroporto -- saturacao de
@@ -542,13 +593,18 @@ C.6 — INTERPRETACAO EM QUATRO NIVEIS
     recorte, e isso PRECISA ser dito sempre que citado.
 
 ==========================================================================
-C.7 — PREPARACAO PARA P11 (NAO E P11 — apenas distribuicao e criterios)
+C.7 — CONTEXTO HISTORICO PARA P11 (ver Bloco F para o P11 real)
 ==========================================================================
-P11 (Bloco F, nao implementado nesta rodada) pede as 10 combinacoes
-aeroporto x faixa horaria com maior potencial de reducao de minutos de
-atraso. Esta secao mostra a distribuicao de volume das celulas e propoe
-criterios de elegibilidade, para que a escolha seja informada antes da
-implementacao.
+NOTA (2026-08-18): esta secao foi escrita ANTES do P11 ser implementado
+e usa o HISTORICO COMPLETO (2019-2026), coerente com o horizonte de H2
+nesta secao. O P11 REAL foi implementado em `08_bloco_f_priorizacao.py`
+(docs/eda_bloco_f.md) com decisoes proprias, aprovadas depois desta
+secao ter sido escrita: horizonte de 12 MESES (jul/2025-jun/2026, D5),
+corte de celula proprio (VOLUME_MINIMO_CELULA_P11=500, recalculado para
+essa janela -- NAO o VOLUME_MINIMO_AEROPORTO_FAIXA=1.000 usado abaixo),
+mais 3 criterios adicionais e ranking por IMPACTO e por TAXA em paralelo.
+O que segue e mantido como CONTEXTO historico -- os numeros abaixo usam
+o historico completo e NAO devem ser lidos como o ranking do P11.
 
 celulas aeroporto x faixa_3h no universo (nao vazias) : 1,221
 celulas elegiveis (n >= VOLUME_MINIMO_AEROPORTO_FAIXA=1,000) : 382
