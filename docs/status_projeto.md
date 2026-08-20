@@ -19,35 +19,62 @@ encontraram: (a) nenhuma divergência real no KPI 7 — apenas definições de
 denominador diferentes; (b) um **erro real** na primeira implementação de D2,
 corrigido nesta rodada.
 
-### 0.1 Reconciliação do KPI 7 — funil completo (corrigida na 3ª rodada)
+### 0.1 Reconciliação do KPI 7 — interseção de conjuntos (corrigida na 4ª rodada)
 
-A rodada anterior apresentou o número "145 excluídos a mais" ao listar
-5.192.866 logo depois de 5.193.587, o que sugeria `5.193.587 − 5.192.866 =
-145`. **Essa conta está errada: o resultado real é 721.** O 145 pertencia a
-outra subtração (`[C] − [D]`, não `[B] − [D]`). Corrigido abaixo, com cada
-estágio expresso como subconjunto explícito do anterior.
+**Correção de modelo mental (4ª rodada).** As duas rodadas anteriores
+descreveram esta reconciliação como um **funil sequencial** (estágios
+[A]→[B]→[C]→[D], cada um "excluindo" registros do anterior). Essa
+representação é **enganosa**: nenhuma das condições abaixo depende de uma
+ordem de aplicação. São **conjuntos independentes**, definidos por uma
+condição booleana sobre o próprio registro, todos sobre o **mesmo universo**
+(5.452.295 voos). A base do KPI 7 é a **interseção** desses conjuntos, e a
+interseção não tem ordem — calculá-la em qualquer sequência produz
+exatamente o mesmo resultado. A leitura de "funil" foi o que produziu o erro
+da rodada anterior ("145 excluídos a mais" ao listar 5.192.866 logo depois de
+5.193.587): tratar uma diferença entre dois conjuntos quaisquer como se fosse
+sempre "o passo seguinte de uma esteira" leva a subtrair os números errados
+entre si. `5.193.587 − 5.192.866` não é **um** passo do funil — é a diferença
+entre **duas interseções distintas**, cujo valor correto é **721**, não 145.
 
-| Estágio | Filtro | Coluna usada | n | Excluídos do estágio anterior |
-|---|---|---|---|---|
-| Universo analítico | — | — | 5.452.295 | — |
-| [A] REALIZADO | `situacao_voo == "REALIZADO"` | `situacao_voo` | 5.306.208 | 146.087 |
-| [B] + partida completa | `partida_prevista` e `partida_real` preenchidas | idem | **5.193.587** | 112.621 |
-| [C] + `atraso_valido` | `\|atraso_partida_min\| ≤ 1440` | `atraso_partida_min` | **5.193.012** | 575 |
-| [D] + `chegada_individualmente_valida` (= base do KPI 7, via `atraso_chegada_valido`) | chegada disponível + `\|atraso_chegada_min\| ≤ 1440` + `chegada_real ≥ partida_real` | `atraso_chegada_min`, `chegada_real`, `partida_real` | **5.192.866** | 146 |
+**Os seis conjuntos elementares, todos sobre o universo de 5.452.295 voos:**
 
-Cada estágio é **subconjunto exato** do anterior ([D] ⊂ [C] ⊂ [B] ⊂ [A]) —
-verificado por teste, não assumido.
+| Conjunto | Condição | \|conjunto\| |
+|---|---|---|
+| `R` | `situacao_voo == "REALIZADO"` | 5.306.208 |
+| `P` | `partida_prevista` e `partida_real` preenchidas | — (só relevante combinado) |
+| `Lp` | `\|atraso_partida_min\| ≤ 1440` | — (idem) |
+| `Dc` | `chegada_prevista` e `chegada_real` preenchidas (= `chegada_disponivel`) | — (idem) |
+| `Lc` | `\|atraso_chegada_min\| ≤ 1440` | — (idem) |
+| `K` | `chegada_real ≥ partida_real` (coerência cronológica) | — (idem) |
 
-**Definição formal do conjunto de 146 registros ([C] \ [D]):**
+Duas interseções nomeadas, cada uma com significado analítico próprio:
 
 ```
-conjunto_146 = atraso_valido == True  AND  chegada_individualmente_valida == False
+atraso_valido                    = R ∩ P ∩ Lp                         (5.193.012)
+chegada_individualmente_valida   = Dc ∩ Lc ∩ K                        (5.192.931)
+atraso_chegada_valido            = atraso_valido ∩ chegada_individualmente_valida
+                                  = R ∩ P ∩ Lp ∩ Dc ∩ Lc ∩ K           (5.192.866, base do KPI 7)
 ```
 
-isto é: partida dentro do universo de cálculo (`atraso_valido=True`), mas a
-chegada falha em pelo menos uma das 3 condições de `chegada_individualmente_
-valida` (disponibilidade, limite de 24h, coerência cronológica). Decompõe-se,
-pelo motivo principal, em:
+**Interseções intermediárias que apareceram em relatórios anteriores,
+agora nomeadas explicitamente como interseções, não como "estágios":**
+
+| Interseção | Valor | O que é |
+|---|---|---|
+| `\|R ∩ P\|` | **5.193.587** | REALIZADO **e** partida completa — não depende de `Lp`, `Dc`, `Lc` nem `K` |
+| `\|R ∩ P ∩ Lp\|` = `\|atraso_valido\|` | **5.193.012** | acrescenta `Lp` à interseção anterior |
+| `\|atraso_chegada_valido\|` | **5.192.866** | interseção de **todos os seis** conjuntos |
+
+**Definição formal do conjunto de 146 ( `atraso_valido \ atraso_chegada_valido` ):**
+
+```
+conjunto_146 = atraso_valido ∩ ¬(chegada_individualmente_valida)
+             = atraso_valido ∩ (¬Dc ∪ ¬Lc ∪ ¬K)
+```
+
+isto é: a interseção do conjunto `atraso_valido` com o **complemento** (união
+dos complementos) da validade de chegada — não "o que sobra depois do passo
+anterior". Decompõe-se, pelo motivo principal, em:
 
 | Motivo principal | n |
 |---|---|
@@ -55,12 +82,18 @@ pelo motivo principal, em:
 | `chegada_anterior_a_partida` | 1 |
 | **total** | **146** |
 
-**Decomposição de `[B] − [D] = 721`** (a subtração que a rodada anterior
-tentou fazer e errou): dentro de [B] (REALIZADO + partida completa), só 3 dos
-5 motivos possíveis ocorrem — `chegada_prevista_ausente` e `chegada_real_
-ausente` são **zero** dentro de [B], porque, na base observada, todo voo
-REALIZADO com partida completa também tem os dois campos de chegada
-preenchidos:
+**Definição formal de `(R ∩ P) \ atraso_chegada_valido = 721`:**
+
+```
+721 = (R ∩ P) ∩ ¬(Lp ∩ Dc ∩ Lc ∩ K)
+    = (R ∩ P) ∩ (¬Lp ∪ ¬Dc ∪ ¬Lc ∪ ¬K)
+```
+
+união de complementos, não uma subtração em cadeia. Dentro de `R ∩ P`, só 3
+dos 5 motivos possíveis ocorrem — `chegada_prevista_ausente` e `chegada_real_
+ausente` são **zero** aqui, porque, na base observada, todo voo `R ∩ P` (voo
+com situação REALIZADO e partida completa) também tem os dois campos de
+chegada preenchidos:
 
 | Motivo principal | n |
 |---|---|
@@ -69,11 +102,22 @@ preenchidos:
 | `chegada_anterior_a_partida` | 1 |
 | **total** | **721** |
 
-O `partida_invalida` aqui é **65, não 575**: dos 575 outliers de partida que
-existem no universo inteiro, a maioria também tem problema de chegada e é
-rotulada pelo motivo de chegada (que vem antes na ordem de precedência) —
-só 65 outliers de partida têm chegada disponível, dentro do limite e
-cronológica, e por isso "sobram" para o motivo `partida_invalida`.
+O `partida_invalida` aqui é **65, não 575**: dos 575 registros em `R ∩ P` que
+falham `Lp` (outliers de partida), a maioria **também** falha alguma condição
+de chegada — e como o motivo principal usa uma ordem de precedência que
+prioriza a chegada, esses casos aparecem rotulados como problema de chegada,
+não de partida. Isso é uma escolha de **rotulagem** (qual único motivo
+exibir quando vários se aplicam), não uma segunda camada de filtro — o
+conjunto `R ∩ P ∩ ¬Lp` (575) e o subconjunto dele que "sobra" sem nenhum
+problema de chegada (65) coexistem no mesmo cálculo de interseção, sem
+nenhuma ordem imposta entre `Lp` e as condições de chegada.
+
+**Nota sobre a ordem de precedência do motivo principal.** A ordem em
+`MOTIVOS_INVALIDEZ_CHEGADA` decide **apenas qual rótulo aparece** quando um
+registro pertence a mais de um dos cinco conjuntos de "problema" (ver §0.2) —
+ela **não** afeta se o registro está ou não em `atraso_chegada_valido`. A
+elegibilidade é sempre a mesma interseção, independente de qualquer ordem;
+só a escolha de **qual motivo mostrar** depende de uma ordem declarada.
 
 **Terminologia corrigida.** A rodada anterior também usou "chegada
 registrada" e `chegada_valida` como sinônimos — não são. Três conceitos

@@ -13,6 +13,7 @@
 data/raw/*
 data/interim/*
 data/processed/*
+data/powerbi/*
 *.parcial
 
 # Amostras pequenas usadas na documentacao permanecem versionadas.

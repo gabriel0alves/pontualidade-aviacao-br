@@ -68,6 +68,12 @@ outliers extremos excluidos das metricas: 575 (0.0111%)
   -> NAO removidos da base; apenas marcados com atraso_valido=False,
      para que continuem auditaveis e possam ser reanalisados.
 
+partida_disponivel (P, isolado, universo inteiro): 5,193,587
+partida_dentro_do_limite (Lp, isolado, universo inteiro): 5,193,012
+  -> expostas para permitir reconstruir R e P combinados (base do
+     conjunto de 721 da reconciliacao do KPI 7) fora deste script,
+     sem duplicar logica.
+
 --------------------------------------------------------------------------
 R6 — CLASSIFICACAO DE ATRASO (campo derivado)
 --------------------------------------------------------------------------
@@ -273,5 +279,5 @@ aeroportos (origem)           : 292
 rotas                         : 3,737
 
 gravado: D:\Projetos\PortifolioAnaliseDeDados\pontualidade-aviacao-br\data\processed\voos.parquet
-tamanho: 163.7 MB
+tamanho: 164.2 MB
 ```

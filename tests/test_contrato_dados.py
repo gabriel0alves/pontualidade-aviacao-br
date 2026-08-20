@@ -52,6 +52,9 @@ COLUNAS_DERIVADAS = [
     "problema_atraso_chegada_acima_do_limite", "problema_partida_invalida",
     # decisao D4 (R11)
     "faixa_3h", "periodo_dia",
+    # R5 -- flags positivas da partida, expostas isoladamente (2026-08-18),
+    # espelhando chegada_disponivel do lado da chegada. Ver regras.py, R5.
+    "partida_disponivel", "partida_dentro_do_limite",
 ]
 
 # Valores de referencia, reproduzidos na auditoria de 2026-08-17.
@@ -185,6 +188,42 @@ def test_r5_atraso_valido_implica_partida_preenchida_e_dentro_do_limite(caminho_
     assert (v["situacao_voo"] == "REALIZADO").all(), (
         "voo cancelado nao pode ter atraso valido"
     )
+
+
+def test_r5_flags_positivas_partida_isoladas(caminho_universo):
+    """
+    partida_disponivel (P) e partida_dentro_do_limite (Lp), materializadas em
+    2026-08-18 para espelhar chegada_disponivel do lado da chegada, exposta
+    isoladamente para que a pagina de diagnostico do KPI 7 no Power BI nao
+    precise de cartao estatico -- ver docs/especificacao_powerbi.md secao 13.3.
+
+    Confirma tres coisas que a especificacao do Power BI presumia mas nao
+    tinha como verificar sem estas colunas:
+      1. partida_disponivel reproduz exatamente a checagem de nulidade;
+      2. partida_dentro_do_limite e SEMPRE False quando partida_disponivel e
+         False -- isso resolve empiricamente a suposicao registrada em
+         docs/especificacao_powerbi.md (a comparacao de NaN com <= devolve
+         False no pandas, mas isso nao devia ser um fato assumido sem teste);
+      3. atraso_valido = REALIZADO AND partida_disponivel AND
+         partida_dentro_do_limite, reproduzindo R5 por fora do script.
+    """
+    df = pd.read_parquet(caminho_universo, columns=[
+        "partida_disponivel", "partida_dentro_do_limite", "partida_prevista",
+        "partida_real", "atraso_partida_min", "situacao_voo", "atraso_valido"])
+
+    esperado_disponivel = df["partida_prevista"].notna() & df["partida_real"].notna()
+    assert df["partida_disponivel"].equals(esperado_disponivel)
+    assert int(df["partida_disponivel"].sum()) == 5_193_587
+
+    # (2) Lp nunca e True quando P e False -- P e pre-condicao necessaria de Lp.
+    indisponivel = ~df["partida_disponivel"]
+    assert int((df["partida_dentro_do_limite"] & indisponivel).sum()) == 0
+    assert int(df["partida_dentro_do_limite"].sum()) == N_ATRASO_VALIDO
+
+    # (3) atraso_valido reconstruido por fora, a partir das flags isoladas.
+    realizado = df["situacao_voo"] == "REALIZADO"
+    reconstruido = realizado & df["partida_disponivel"] & df["partida_dentro_do_limite"]
+    assert df["atraso_valido"].equals(reconstruido)
 
 
 def test_outliers_foram_marcados_nao_removidos(caminho_universo):
@@ -636,26 +675,35 @@ def test_r11_faixa_3h_nula_exatamente_onde_hora_prevista_nula(caminho_universo):
 
 def test_reconciliacao_kpi7_sobre_dados_reais(caminho_universo):
     """
-    Reproduz, sobre o artefato real, o funil de 4 estagios documentado em
-    docs/status_projeto.md:
+    Reproduz, sobre o artefato real, a reconciliacao do KPI 7 documentada em
+    docs/status_projeto.md como INTERSECCAO DE CONJUNTOS -- NAO um funil
+    sequencial. Cada conjunto abaixo (R, RP, atraso_valido,
+    atraso_chegada_valido) e definido por uma condicao booleana independente
+    sobre o MESMO universo; a ordem em que sao combinados nao muda o
+    resultado (interseccao e comutativa e associativa):
 
-      [A] REALIZADO                                            5.306.208
-      [B] [A] + partida_prevista e partida_real preenchidas     5.193.587
-      [C] [B] + atraso_valido (partida dentro de 24h)           5.193.012
-      [D] [C] + chegada_individualmente_valida (elegib. KPI 7)  5.192.866
+      R  = REALIZADO                                                5.306.208
+      RP = R ∩ P (partida_prevista e partida_real preenchidas)      5.193.587
+      atraso_valido = RP ∩ Lp (|atraso_partida_min| <= 1440)        5.193.012
+      atraso_chegada_valido = atraso_valido ∩ chegada_individualmente_valida
+                            = R ∩ P ∩ Lp ∩ Dc ∩ Lc ∩ K              5.192.866
 
-    Cada estagio e SUBCONJUNTO do anterior (D subset C subset B subset A).
-    A diferenca [B]-[D] = 721 NAO e um numero solto: e a soma exata dos 3
-    motivos que podem ocorrer dentro de [B] (chegada_prevista_ausente e
-    chegada_real_ausente sao SEMPRE zero dentro de B -- um voo REALIZADO com
-    partida completa sempre tem os dois campos de chegada preenchidos, na
-    base observada):
+    atraso_chegada_valido e SUBCONJUNTO de atraso_valido, que e subconjunto
+    de RP, que e subconjunto de R -- verificado abaixo, nao assumido. Mas
+    "subconjunto de" aqui descreve uma relacao MATEMATICA entre conjuntos
+    definidos independentemente, nao um pipeline de filtragem em etapas.
+
+    RP \\ atraso_chegada_valido = 721 e a soma exata dos 3 motivos que
+    ocorrem dentro de RP (chegada_prevista_ausente e chegada_real_ausente
+    sao SEMPRE zero dentro de RP -- um voo REALIZADO com partida completa
+    sempre tem os dois campos de chegada preenchidos, na base observada):
         655 atraso_chegada_acima_do_limite
       +  65 partida_invalida (subconjunto dos 575 outliers de partida que
              TAMBEM tem chegada disponivel, valida e cronologica -- por isso
              65, nao 575: a maioria dos outliers de partida tambem tem
-             problema de chegada e e rotulada pelo motivo de chegada, que
-             vem antes na precedencia)
+             problema de chegada e e ROTULADA pelo motivo de chegada, por
+             causa da ordem de precedencia do motivo PRINCIPAL -- o que nao
+             afeta a interseccao em si, so a escolha de qual motivo exibir)
       +   1 chegada_anterior_a_partida
       = 721
     """
@@ -664,42 +712,43 @@ def test_reconciliacao_kpi7_sobre_dados_reais(caminho_universo):
         "atraso_partida_min", "atraso_chegada_min", "atraso_valido",
         "atraso_chegada_valido", "motivo_principal_invalidez_chegada"])
 
-    realizado = df["situacao_voo"] == "REALIZADO"
-    A = realizado
-    assert int(A.sum()) == 5_306_208
+    R = df["situacao_voo"] == "REALIZADO"
+    assert int(R.sum()) == 5_306_208
 
-    tem_partida = df["partida_prevista"].notna() & df["partida_real"].notna()
-    B = realizado & tem_partida
-    assert int(B.sum()) == 5_193_587
+    P = df["partida_prevista"].notna() & df["partida_real"].notna()
+    RP = R & P
+    assert int(RP.sum()) == 5_193_587
 
-    C = df["atraso_valido"]
-    assert int(C.sum()) == N_ATRASO_VALIDO  # 5.193.012
-    assert (C & ~B).sum() == 0, "atraso_valido tem que ser subconjunto de B"
-    assert int(B.sum()) - int(C.sum()) == 575
+    atraso_valido = df["atraso_valido"]
+    assert int(atraso_valido.sum()) == N_ATRASO_VALIDO  # 5.193.012
+    assert (atraso_valido & ~RP).sum() == 0, "atraso_valido tem que ser subconjunto de RP"
+    assert int(RP.sum()) - int(atraso_valido.sum()) == 575
 
-    D = df["atraso_chegada_valido"]
-    assert int(D.sum()) == N_ATRASO_CHEGADA_VALIDO  # 5.192.866
-    assert (D & ~C).sum() == 0, "atraso_chegada_valido tem que ser subconjunto de C"
+    atraso_chegada_valido = df["atraso_chegada_valido"]
+    assert int(atraso_chegada_valido.sum()) == N_ATRASO_CHEGADA_VALIDO  # 5.192.866
+    assert (atraso_chegada_valido & ~atraso_valido).sum() == 0, (
+        "atraso_chegada_valido tem que ser subconjunto de atraso_valido"
+    )
 
-    # --- definicao formal dos 146 = [C] \ [D] ---------------------------
-    # atraso_valido=True (esta em C) E chegada_individualmente_valida=False
-    # (falha em pelo menos uma das 3 condicoes de chegada). Equivalente, por
-    # construcao de atraso_chegada_valido, a "C & ~D".
-    conjunto_146 = C & ~D
+    # --- definicao formal dos 146 = atraso_valido \ atraso_chegada_valido --
+    # interseccao de atraso_valido com o COMPLEMENTO da validade de chegada
+    # (uniao dos complementos de disponibilidade/limite/cronologia) -- nao
+    # "o que sobra depois do passo anterior".
+    conjunto_146 = atraso_valido & ~atraso_chegada_valido
     assert int(conjunto_146.sum()) == 146
     motivo_dos_146 = df.loc[conjunto_146, "motivo_principal_invalidez_chegada"].value_counts()
     assert motivo_dos_146.get("atraso_chegada_acima_do_limite", 0) == 145
     assert motivo_dos_146.get("chegada_anterior_a_partida", 0) == 1
-    assert motivo_dos_146.sum() == 146  # nenhum outro motivo aparece dentro de C
+    assert motivo_dos_146.sum() == 146  # nenhum outro motivo aparece dentro de atraso_valido
 
-    # --- decomposicao de B \ D = 721 -------------------------------------
-    conjunto_721 = B & ~D
+    # --- decomposicao de RP \ atraso_chegada_valido = 721 -------------------
+    conjunto_721 = RP & ~atraso_chegada_valido
     assert int(conjunto_721.sum()) == 721
     motivo_dos_721 = df.loc[conjunto_721, "motivo_principal_invalidez_chegada"].value_counts()
     assert motivo_dos_721.get("atraso_chegada_acima_do_limite", 0) == 655
     assert motivo_dos_721.get("partida_invalida", 0) == 65
     assert motivo_dos_721.get("chegada_anterior_a_partida", 0) == 1
-    assert motivo_dos_721.sum() == 721  # chegada_prevista/real_ausente = 0 dentro de B
+    assert motivo_dos_721.sum() == 721  # chegada_prevista/real_ausente = 0 dentro de RP
 
     extremos_no_universo = df["atraso_chegada_min"].abs() > regras.LIMITE_ATRASO_CHEGADA_MIN
     assert int(extremos_no_universo.sum()) == 655

@@ -45,6 +45,7 @@ from regras import (
     TOP_N_AEROPORTOS,
     VOLUME_MINIMO_AEROPORTO_FAIXA,
 )
+from metricas_compartilhadas import decompor_variancia, otp15
 
 BASE = Path(__file__).resolve().parents[1]
 ENTRADA = BASE / "data" / "processed" / "voos.parquet"
@@ -77,55 +78,6 @@ class Rel:
         self("\n" + "=" * 74)
         self(t)
         self("=" * 74)
-
-
-def otp15(s: pd.Series) -> float:
-    """OTP15 em pp a partir de uma serie de atraso_partida_min."""
-    return float((s <= LIMIAR_PONTUALIDADE).mean() * 100)
-
-
-def decompor_variancia(
-    df: pd.DataFrame, coluna_grupo: str, min_celula: int = MIN_CELULA_H2
-) -> dict:
-    """
-    Decomposicao de variancia entre icao_origem e `coluna_grupo`.
-
-    Metodo (nao e ANOVA de dois fatores com termo de interacao -- e mais
-    simples e mais transparente, adequado a um projeto sem scipy/statsmodels):
-      1. celula = media de OTP15 por (icao_origem, coluna_grupo), com
-         n >= min_celula;
-      2. 'variancia entre GRUPO, dentro do aeroporto': para cada aeroporto com
-         >=2 grupos na celula, variancia (populacional) das medias de grupo;
-         media ponderada por volume entre aeroportos;
-      3. 'variancia entre AEROPORTO, dentro do grupo': espelhado, para cada
-         grupo com >=2 aeroportos.
-    Razao (3)/(2) > 1 e COMPATIVEL com H2 (aeroporto varia mais que grupo);
-    < 1 REFUTA H2 (grupo varia mais). Associativo, nao causal.
-    """
-    cel = df.groupby(["icao_origem", coluna_grupo], observed=True).agg(
-        n=("atraso_partida_min", "size"),
-        otp15=("atraso_partida_min", otp15),
-    ).reset_index()
-    cel = cel[cel["n"] >= min_celula]
-
-    por_aero = cel.groupby("icao_origem").filter(lambda g: len(g) >= 2)
-    var_por_aero = por_aero.groupby("icao_origem")["otp15"].var(ddof=0)
-    n_por_aero = por_aero.groupby("icao_origem")["n"].sum().reindex(var_por_aero.index)
-    v_grupo_dentro_aero = float(np.average(var_por_aero, weights=n_por_aero))
-
-    por_grupo = cel.groupby(coluna_grupo).filter(lambda g: len(g) >= 2)
-    var_por_grupo = por_grupo.groupby(coluna_grupo)["otp15"].var(ddof=0)
-    n_por_grupo = por_grupo.groupby(coluna_grupo)["n"].sum().reindex(var_por_grupo.index)
-    v_aero_dentro_grupo = float(np.average(var_por_grupo, weights=n_por_grupo))
-
-    return {
-        "n_celulas": len(cel),
-        "n_aeroportos_comparaveis": int(por_aero["icao_origem"].nunique()),
-        "n_grupos_comparaveis": int(por_grupo[coluna_grupo].nunique()),
-        "var_grupo_dentro_aeroporto": v_grupo_dentro_aero,
-        "var_aeroporto_dentro_grupo": v_aero_dentro_grupo,
-        "razao_aeroporto_sobre_grupo": v_aero_dentro_grupo / v_grupo_dentro_aero,
-    }
 
 
 def main() -> int:
@@ -220,7 +172,7 @@ def main() -> int:
     r("SENSIBILIDADE DE ESCOPO, nao como uma conclusao unica.")
     r("")
     r("--- C.2.a  TODAS as operadoras (inclui 'Outros', heterogeneo -- D3) ---")
-    d_todas = decompor_variancia(base, "operadora_analitica")
+    d_todas = decompor_variancia(base, "operadora_analitica", min_celula=MIN_CELULA_H2)
     r(f"  celulas (n>={MIN_CELULA_H2:,})              : {d_todas['n_celulas']}")
     r(f"  aeroportos comparaveis (>=2 operadoras) : {d_todas['n_aeroportos_comparaveis']}")
     r(f"  operadoras comparaveis (>=2 aeroportos) : {d_todas['n_grupos_comparaveis']}")
@@ -234,7 +186,7 @@ def main() -> int:
     r("")
     r("--- C.2.b  SOMENTE Azul, LATAM, GOL (exclui 'Outros' e regionais) ---")
     big3 = base[base["operadora_analitica"].isin(GRANDES)]
-    d_big3 = decompor_variancia(big3, "operadora_analitica")
+    d_big3 = decompor_variancia(big3, "operadora_analitica", min_celula=MIN_CELULA_H2)
     r(f"  celulas (n>={MIN_CELULA_H2:,})              : {d_big3['n_celulas']}")
     r(f"  aeroportos comparaveis                  : {d_big3['n_aeroportos_comparaveis']}")
     r(f"  operadoras comparaveis                  : {d_big3['n_grupos_comparaveis']}")
@@ -247,7 +199,7 @@ def main() -> int:
     r("")
     r("--- C.2.c  SENSIBILIDADE: grupo_economico (Azul = mainline + Conecta) ---")
     big3_grupo = base[base["grupo_economico"].isin(GRANDES)]
-    d_grupo = decompor_variancia(big3_grupo, "grupo_economico")
+    d_grupo = decompor_variancia(big3_grupo, "grupo_economico", min_celula=MIN_CELULA_H2)
     r(f"  var. ENTRE OPERADORAS/GRUPOS, dentro do aeroporto : {d_grupo['var_grupo_dentro_aeroporto']:.2f} pp^2")
     r(f"  var. ENTRE AEROPORTOS, dentro do grupo            : {d_grupo['var_aeroporto_dentro_grupo']:.2f} pp^2")
     r(f"  razao (aeroporto/grupo economico) : {d_grupo['razao_aeroporto_sobre_grupo']:.2f}")

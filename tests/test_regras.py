@@ -582,42 +582,46 @@ def test_limitacao_de_fuso_horario_esta_documentada():
 
 
 # ============================================================================
-# RECONCILIACAO DO KPI 7 — funil e precedencia (2a rodada, 2026-08-17)
+# RECONCILIACAO DO KPI 7 — interseccao de conjuntos e precedencia (4a rodada)
 # ============================================================================
 
-def test_reconciliacao_funil_do_kpi7_com_dados_sinteticos():
+def test_reconciliacao_interseccao_do_kpi7_com_dados_sinteticos():
     """
-    Reproduz em miniatura o funil completo (universo -> REALIZADO -> partida
-    completa -> atraso_valido -> atraso_chegada_valido), com casos desenhados
-    para exercitar CADA fronteira que apareceu nos numeros divergentes de
+    Reproduz em miniatura a reconciliacao do KPI 7 como INTERSECCAO DE
+    CONJUNTOS (R=REALIZADO, P=partida completa, Lp=partida dentro do limite,
+    e a validade de chegada), NAO como funil sequencial -- corrigido na 4a
+    rodada, apos a rodada anterior descrever isso como estagios [A]-[D],
+    o que sugeria (erradamente) uma ordem de filtragem. Casos desenhados para
+    exercitar CADA interseccao que apareceu nos numeros divergentes de
     relatorios anteriores (5.193.012, 5.193.587, 145, 146, 655).
 
     Nao substitui a reconciliacao sobre o dado real (ver
     tests/test_contrato_dados.py e docs/status_projeto.md) -- serve para travar
-    a LOGICA do funil de forma rapida e deterministica.
+    a LOGICA das interseccoes de forma rapida e deterministica.
     """
     linhas = pd.DataFrame([
         # situacao,   partida_prev, partida_real, chegada_prev, chegada_real
-        ("CANCELADO", "2024-01-01 10:00", None, None, None),                     # fora em [A]
-        ("REALIZADO", None, None, "2024-01-01 12:00", "2024-01-01 12:30"),       # fora em [B] (sem partida)
-        ("REALIZADO", "2024-01-01 10:00", "2024-01-03 10:05", "2024-01-01 12:00", "2024-01-03 12:30"),  # outlier de partida (>24h) -> fora em [C]
-        ("REALIZADO", "2024-01-01 10:00", "2024-01-01 10:05", "2024-01-01 12:00", "2024-01-05 12:30"),  # atraso_chegada > 24h -> fora em [D], DENTRO de atraso_valido
-        ("REALIZADO", "2024-01-01 10:00", "2024-01-01 10:05", "2024-01-01 12:00", "2024-01-01 12:30"),  # valido em tudo
+        ("CANCELADO", "2024-01-01 10:00", None, None, None),                     # fora de R
+        ("REALIZADO", None, None, "2024-01-01 12:00", "2024-01-01 12:30"),       # em R, fora de P (sem partida)
+        ("REALIZADO", "2024-01-01 10:00", "2024-01-03 10:05", "2024-01-01 12:00", "2024-01-03 12:30"),  # em R∩P, fora de Lp (outlier de partida >24h)
+        ("REALIZADO", "2024-01-01 10:00", "2024-01-01 10:05", "2024-01-01 12:00", "2024-01-05 12:30"),  # em atraso_valido (R∩P∩Lp), fora da validade de chegada (>24h)
+        ("REALIZADO", "2024-01-01 10:00", "2024-01-01 10:05", "2024-01-01 12:00", "2024-01-01 12:30"),  # na interseccao de TODOS os conjuntos
     ], columns=["situacao_voo", "partida_prevista", "partida_real",
                 "chegada_prevista", "chegada_real"])
     for c in ("partida_prevista", "partida_real", "chegada_prevista", "chegada_real"):
         linhas[c] = pd.to_datetime(linhas[c])
 
-    realizado = linhas["situacao_voo"] == "REALIZADO"
-    tem_partida = linhas["partida_prevista"].notna() & linhas["partida_real"].notna()
+    R = linhas["situacao_voo"] == "REALIZADO"
+    P = linhas["partida_prevista"].notna() & linhas["partida_real"].notna()
     atraso_partida = (linhas["partida_real"] - linhas["partida_prevista"]).dt.total_seconds() / 60
-    atraso_valido = realizado & tem_partida & (atraso_partida.abs() <= regras.LIMITE_ATRASO_MIN)
+    Lp = atraso_partida.abs() <= regras.LIMITE_ATRASO_MIN
+    atraso_valido = R & P & Lp
 
-    # estagio [A]: REALIZADO
-    assert int(realizado.sum()) == 4
-    # estagio [B]: [A] com partida completa
-    assert int((realizado & tem_partida).sum()) == 3
-    # estagio [C]: atraso_valido (exclui o outlier de partida)
+    # |R| -- conjunto REALIZADO, isoladamente
+    assert int(R.sum()) == 4
+    # |R ∩ P| -- interseccao com partida completa (nao depende de Lp)
+    assert int((R & P).sum()) == 3
+    # |R ∩ P ∩ Lp| = |atraso_valido| -- acrescenta a interseccao com Lp
     assert int(atraso_valido.sum()) == 2
 
     tem_chegada = linhas["chegada_prevista"].notna() & linhas["chegada_real"].notna()
@@ -628,9 +632,11 @@ def test_reconciliacao_funil_do_kpi7_com_dados_sinteticos():
         & cronologica.fillna(False))
     atraso_chegada_valido = atraso_valido & chegada_individualmente_valida
 
-    # estagio [D]: atraso_chegada_valido -- exclui o caso de chegada extrema,
-    # mesmo esse caso tendo atraso_valido=True (padrao dos 146 registros reais
-    # de docs/status_projeto.md: validos na partida, invalidos na chegada).
+    # atraso_chegada_valido = atraso_valido ∩ chegada_individualmente_valida:
+    # a interseccao remove o caso de chegada extrema mesmo ele tendo
+    # atraso_valido=True (padrao dos 146 registros reais de
+    # docs/status_projeto.md: na interseccao de partida, fora da interseccao
+    # de chegada).
     assert int(atraso_chegada_valido.sum()) == 1
     extremos_com_partida_valida = int((atraso_valido & (atraso_chegada.abs() > regras.LIMITE_ATRASO_CHEGADA_MIN)).sum())
     assert extremos_com_partida_valida == 1

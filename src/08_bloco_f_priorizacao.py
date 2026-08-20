@@ -54,6 +54,7 @@ from regras import (
     TOP_N_AEROPORTOS,
     VOLUME_MINIMO_CELULA_P11,
 )
+from metricas_compartilhadas import montar_celulas_p11
 
 BASE = Path(__file__).resolve().parents[1]
 ENTRADA = BASE / "data" / "processed" / "voos.parquet"
@@ -110,7 +111,6 @@ def main() -> int:
     j = df[df["ano_mes"].isin(meses_janela)].copy()
     valido = j[j["atraso_valido"]].copy()
     valido["impacto_min"] = np.clip(valido["atraso_partida_min"].to_numpy(), 0, None)
-    realizado = j[j["situacao_voo"] == "REALIZADO"]
     base_c = j[j["situacao_voo"].isin(["REALIZADO", "CANCELADO"])].copy()
     base_c["cancelado"] = base_c["situacao_voo"] == "CANCELADO"
 
@@ -120,50 +120,15 @@ def main() -> int:
     # ------------------------------------------------------------------
     r.sec("F.2 — METRICAS POR CELULA (aeroporto x faixa_3h)")
     # ------------------------------------------------------------------
-    g = valido.groupby(["icao_origem", "faixa_3h"], observed=True)
-    cel = pd.DataFrame({
-        "volume_valido": g.size(),
-        "otp15_pct": g["atrasado_15"].apply(lambda s: round((1 - s.mean()) * 100, 2)),
-        "mediana_atraso_min": g["atraso_partida_min"].median(),
-        "minutos_acumulados": g["impacto_min"].sum().round(0).astype(int),
-    })
-
-    g_realizado = realizado.groupby(["icao_origem", "faixa_3h"], observed=True).size()
-    cel["volume_realizado"] = g_realizado.reindex(cel.index).fillna(0).astype(int)
-    cel["cobertura_partidas_validas_pct"] = (
-        cel["volume_valido"] / cel["volume_realizado"].replace(0, np.nan) * 100
-    ).round(2)
-
-    g_c = base_c.groupby(["icao_origem", "faixa_3h"], observed=True)
-    cancel_tab = pd.DataFrame({
-        "volume_programado": g_c.size(),
-        "cancelados": g_c["cancelado"].sum(),
-    })
-    cel = cel.join(cancel_tab, how="left")
-    cel["taxa_cancelamento_pct"] = (
-        cel["cancelados"] / cel["volume_programado"] * 100).round(2)
-
-    meses_por_cel = (valido.groupby(["icao_origem", "faixa_3h"], observed=True)["ano_mes"]
-                     .nunique().rename("meses_operacao"))
-    cel["meses_operacao"] = meses_por_cel.reindex(cel.index).fillna(0).astype(int)
-
-    top_op = (valido.groupby(["icao_origem", "faixa_3h", "operadora_analitica"], observed=True)
-              .size().reset_index(name="n"))
-    top_op = (top_op.sort_values("n", ascending=False)
-              .drop_duplicates(["icao_origem", "faixa_3h"])
-              .set_index(["icao_origem", "faixa_3h"]))
-    cel["operadora_principal"] = top_op["operadora_analitica"]
-    cel["participacao_operadora_principal_pct"] = (
-        top_op["n"].reindex(cel.index) / cel["volume_valido"] * 100).round(2)
-
-    h1 = set(pd.period_range(HORIZONTE_P11_INICIO, freq="M", periods=6).astype(str))
-    h2 = set(meses_janela) - h1
-    v2 = valido.copy()
-    v2["subperiodo"] = np.where(v2["ano_mes"].isin(h1), "H1", "H2")
-    otp_sub = (v2.groupby(["icao_origem", "faixa_3h", "subperiodo"], observed=True)
-               ["atrasado_15"].mean().mul(100).unstack("subperiodo"))
-    cel["delta_otp15_subperiodos_pp"] = (
-        (otp_sub.get("H2") - otp_sub.get("H1")).abs().reindex(cel.index)).round(2)
+    cel = montar_celulas_p11(
+        j,
+        volume_minimo=VOLUME_MINIMO_CELULA_P11,
+        cobertura_minima_pct=COBERTURA_MINIMA_PARTIDAS_VALIDAS_P11,
+        meses_minimos=MESES_MINIMOS_OPERACAO_P11,
+        limiar_instabilidade_pp=LIMIAR_INSTABILIDADE_P11_PP,
+        limiar_concentracao_pct=LIMIAR_CONCENTRACAO_OPERADORA_P11,
+        meses_horizonte=MESES_HORIZONTE_P11,
+    )
 
     r(f"celulas nao vazias (por atraso_valido): {len(cel):,}")
     r(f"volume por celula -- p50={cel['volume_valido'].median():.0f}  "
@@ -176,15 +141,7 @@ def main() -> int:
     r(f"[1] volume_valido >= {VOLUME_MINIMO_CELULA_P11:,}")
     r(f"[2] cobertura_partidas_validas_pct >= {COBERTURA_MINIMA_PARTIDAS_VALIDAS_P11}")
     r(f"[3] meses_operacao >= {MESES_MINIMOS_OPERACAO_P11}")
-    elegivel = (
-        (cel["volume_valido"] >= VOLUME_MINIMO_CELULA_P11)
-        & (cel["cobertura_partidas_validas_pct"] >= COBERTURA_MINIMA_PARTIDAS_VALIDAS_P11)
-        & (cel["meses_operacao"] >= MESES_MINIMOS_OPERACAO_P11)
-    )
-    cel["elegivel"] = elegivel
-    cel["flag_instavel"] = cel["delta_otp15_subperiodos_pp"] >= LIMIAR_INSTABILIDADE_P11_PP
-    cel["flag_concentrada_em_1_operadora"] = (
-        cel["participacao_operadora_principal_pct"] >= LIMIAR_CONCENTRACAO_OPERADORA_P11)
+    elegivel = cel["elegivel"]
 
     r(f"\ncelulas elegiveis: {int(elegivel.sum())} de {len(cel)}")
     r(f"  reprovadas so por [1] volume     : "

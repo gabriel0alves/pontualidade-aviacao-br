@@ -203,6 +203,18 @@ def main() -> int:
 
     df["atraso_valido"] = realizado & tem_horarios & dentro_limite
 
+    # --- flags positivas da PARTIDA, expostas isoladamente (2026-08-18) ----
+    # Espelham chegada_disponivel/problema_* do lado da chegada (R10). Ate
+    # esta rodada, so a INTERSECCAO 'atraso_valido' (R∩P∩Lp) era materializada
+    # -- P (partida disponivel) e Lp (atraso de partida dentro do limite) nao
+    # existiam isoladamente, o que impedia reconstruir R∩P (base do conjunto
+    # de 721 da reconciliacao do KPI 7, ver docs/status_projeto.md secao 0.1)
+    # fora deste script. Reusam EXATAMENTE as mesmas variaveis intermediarias
+    # ja calculadas duas linhas acima -- nao introduzem calculo novo, apenas
+    # expoem o que ja era computado internamente.
+    df["partida_disponivel"] = tem_horarios
+    df["partida_dentro_do_limite"] = dentro_limite
+
     log(f"situacao_voo == REALIZADO           : {int(realizado.sum()):,}")
     log(f"  com partida prevista E real       : {int((realizado & tem_horarios).sum()):,}")
     log(f"  com |atraso| <= {LIMITE_ATRASO_MIN} min ({LIMITE_ATRASO_MIN//60}h) : "
@@ -218,6 +230,14 @@ def main() -> int:
             log(f"    {v:,.0f} min ({v/1440:,.1f} dias)")
     log("  -> NAO removidos da base; apenas marcados com atraso_valido=False,")
     log("     para que continuem auditaveis e possam ser reanalisados.")
+    log("")
+    log(f"partida_disponivel (P, isolado, universo inteiro): "
+        f"{int(df['partida_disponivel'].sum()):,}")
+    log(f"partida_dentro_do_limite (Lp, isolado, universo inteiro): "
+        f"{int(df['partida_dentro_do_limite'].sum()):,}")
+    log("  -> expostas para permitir reconstruir R e P combinados (base do")
+    log("     conjunto de 721 da reconciliacao do KPI 7) fora deste script,")
+    log("     sem duplicar logica.")
 
     # ------------------------------------------------------------------
     # R6 — CATEGORIAS DE ATRASO

@@ -67,6 +67,21 @@ CHAVE_NATURAL: list[str] = [
 # Sensibilidade medida em docs/eda_bloco_d.md D.6: o ICA5 varia de 53,8% (corte
 # de 6h) a 56,7% (sem corte), ou seja 2,9 pp -- a escolha de 24h nao carrega o
 # resultado.
+#
+# 'atraso_valido' (04_universo.py, R5) e a INTERSECCAO R∩P∩Lp -- REALIZADO,
+# partida disponivel (P) e atraso de partida dentro deste limite (Lp). Ate
+# 2026-08-18, P e Lp so existiam combinados nessa interseccao. Duas colunas
+# NOVAS expoem os dois conjuntos isoladamente, espelhando o padrao ja usado
+# do lado da chegada (chegada_disponivel, R10 abaixo):
+#   partida_disponivel        = P  (partida_prevista E partida_real preenchidas)
+#   partida_dentro_do_limite  = Lp (|atraso_partida_min| <= LIMITE_ATRASO_MIN)
+# Nenhuma das duas introduz calculo novo -- expoem variaveis intermediarias
+# que R5 ja computava internamente para chegar a 'atraso_valido'. Permitem
+# reconstruir R∩P (base do conjunto de 721 da reconciliacao do KPI 7, ver
+# docs/status_projeto.md secao 0.1) fora de 04_universo.py sem duplicar a
+# regra -- usado pela especificacao do Power BI (docs/especificacao_powerbi.md
+# secao 13.3) para que a pagina de diagnostico do KPI 7 seja 100% dinamica,
+# sem cartao de valor estatico.
 LIMITE_ATRASO_MIN: int = 24 * 60
 
 # ---------------------------------------------------------------------------
@@ -119,11 +134,15 @@ CORTE_SENSIBILIDADE_CHEGADA_H: int = 6
 #     porque essa checagem vem antes na ordem abaixo;
 #   - verificado: 0 divergencias entre o motivo esperado pela ordem de
 #     precedencia e o motivo efetivamente gravado pelo pipeline.
-# Ver docs/status_projeto.md, secao "Reconciliacao do KPI 7" para o funil
-# completo, incluindo a explicacao dos numeros 5.193.012 / 5.193.587 / 145 /
-# 146 / 655 que apareceram em relatorios anteriores -- nenhum e divergencia
-# real; sao definicoes diferentes de denominador ou estagios diferentes do
-# funil (ver docstring de resolve_companhia() para o padrao equivalente
+# Ver docs/status_projeto.md, secao "Reconciliacao do KPI 7" para a
+# reconciliacao completa por INTERSECCAO DE CONJUNTOS (nao um funil
+# sequencial -- cada condicao abaixo e um conjunto independente sobre o MESMO
+# universo, e a elegibilidade do KPI 7 e a interseccao de todos eles;
+# aplicar as condicoes em outra ordem produz o mesmo conjunto final), incluindo
+# a explicacao dos numeros 5.193.012 / 5.193.587 / 145 / 146 / 655 que
+# apareceram em relatorios anteriores -- nenhum e divergencia real; sao
+# definicoes diferentes de denominador ou interseccoes diferentes dos mesmos
+# conjuntos (ver docstring de resolve_companhia() para o padrao equivalente
 # aplicado a companhia).
 MOTIVOS_INVALIDEZ_CHEGADA: tuple[str, ...] = (
     "chegada_prevista_ausente",
@@ -833,6 +852,14 @@ LIMIAR_CONCENTRACAO_OPERADORA_P11: float = 80.0
 #      si so) e 'atraso_chegada_valido' (elegibilidade completa do KPI 7),
 #      para nao confundir disponibilidade com validade. Adicionadas 5 flags
 #      'problema_*' independentes e 'qtd_motivos_invalidez_chegada' -- ver
+#      R10 acima.
+#      CORRECAO DE MODELO MENTAL (4a rodada, 2026-08-18): a reconciliacao do
+#      KPI 7 NAO e um funil sequencial de estagios -- e a INTERSECCAO de
+#      conjuntos independentes (REALIZADO, partida completa, atraso de
+#      partida dentro do limite, chegada disponivel, atraso de chegada dentro
+#      do limite, coerencia cronologica) sobre o MESMO universo. Os numeros
+#      721 e 146 sao diferencas entre interseccoes especificas, nao
+#      remocoes sucessivas -- ver docs/status_projeto.md.
 #      R10 acima.
 #
 # D2 — DIMENSAO DE COMPANHIA .................. APROVADA em 2026-08-17;

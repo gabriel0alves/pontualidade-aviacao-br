@@ -31,6 +31,7 @@ from regras import (
     TOP_N_AEROPORTOS,
     VOLUME_MINIMO_COMPANHIA,
 )
+from metricas_compartilhadas import gini, share_topo
 
 BASE = Path(__file__).resolve().parents[1]
 ENTRADA = BASE / "data" / "processed" / "voos.parquet"
@@ -49,26 +50,6 @@ class Rel:
         self("\n" + "=" * 74)
         self(t)
         self("=" * 74)
-
-
-def share_topo(valores: np.ndarray, pct: float) -> float:
-    """Share do total concentrado nos `pct`% maiores valores."""
-    n = len(valores)
-    k = max(int(np.ceil(n * pct / 100)), 1)
-    total = valores.sum()
-    if total <= 0:
-        return np.nan
-    return np.sort(valores)[-k:].sum() / total
-
-
-def gini(valores: np.ndarray) -> float:
-    """Coeficiente de Gini (0 = distribuicao uniforme, 1 = concentracao total)."""
-    v = np.sort(valores)
-    n = len(v)
-    if n == 0 or v.sum() <= 0:
-        return np.nan
-    indices = np.arange(1, n + 1)
-    return float((2 * (indices * v).sum()) / (n * v.sum()) - (n + 1) / n)
 
 
 def main() -> int:

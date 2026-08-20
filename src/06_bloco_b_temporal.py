@@ -48,6 +48,7 @@ from regras import (
     VOLUME_MINIMO_COMPANHIA,
     regime_do_ano,
 )
+from metricas_compartilhadas import share_topo
 
 BASE = Path(__file__).resolve().parents[1]
 ENTRADA = BASE / "data" / "processed" / "voos.parquet"
@@ -66,16 +67,6 @@ class Rel:
         self("\n" + "=" * 74)
         self(t)
         self("=" * 74)
-
-
-def share_topo(valores: np.ndarray, pct: float) -> float:
-    """Share do total concentrado nos `pct`% maiores valores."""
-    n = len(valores)
-    k = max(int(np.ceil(n * pct / 100)), 1)
-    total = valores.sum()
-    if total <= 0:
-        return np.nan
-    return np.sort(valores)[-k:].sum() / total
 
 
 def rotulo_ano(ano: int, parciais: set[int]) -> str:
