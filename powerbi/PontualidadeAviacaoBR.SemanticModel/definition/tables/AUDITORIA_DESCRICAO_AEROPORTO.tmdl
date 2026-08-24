@@ -1,0 +1,51 @@
+/// Tabela de auditoria, desconectada. Uma linha por variante de descricao observada para cada icao -- nada e descartado silenciosamente.
+table AUDITORIA_DESCRICAO_AEROPORTO
+	lineageTag: 2fad1481-2f4d-4f25-9f43-10ac4c9f71f4
+
+	/// NAO e chave unica sozinha -- grao real e (icao, descricao_variante). Tabela desconectada, so consulta.
+	column icao
+		dataType: string
+		lineageTag: eb4d4021-ab6c-4322-bbca-fed038f42e19
+		summarizeBy: none
+		sourceColumn: icao
+
+	column descricao_variante
+		dataType: string
+		lineageTag: d0f09307-5efc-4a4c-aaab-de8cc547ba12
+		summarizeBy: none
+		sourceColumn: descricao_variante
+
+	column ocorrencias
+		dataType: int64
+		formatString: #,0
+		lineageTag: 2cf09001-c51e-4411-b06f-78235ce24413
+		summarizeBy: none
+		sourceColumn: ocorrencias
+
+	column primeira_observacao
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 588e42b4-4262-4018-88b4-a91e72bb44d4
+		summarizeBy: none
+		sourceColumn: primeira_observacao
+
+	column ultima_observacao
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 4f5d00e2-65c0-4a7a-9588-0986b96ae948
+		summarizeBy: none
+		sourceColumn: ultima_observacao
+
+	partition AUDITORIA_DESCRICAO_AEROPORTO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\AUDITORIA_DESCRICAO_AEROPORTO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"icao", type text}, {"descricao_variante", type text}, {"ocorrencias", Int64.Type}, {"primeira_observacao", type datetime}, {"ultima_observacao", type datetime}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

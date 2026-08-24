@@ -1,0 +1,55 @@
+/// Dimensao de faixa horaria de 3h (R11) -- recorte principal de H3/H4/P8/P6/P11.
+table DIM_FAIXA_HORARIA
+	lineageTag: ca720c30-b226-4b36-9f9e-7e8c1c9523c0
+
+	/// Chave da dimensao. Recorte PRINCIPAL de H3/H4/P8/P6/P11 (R11).
+	column faixa_3h
+		dataType: string
+		lineageTag: 669ef272-d3dc-44b7-95dd-c28a8e28e5a9
+		summarizeBy: none
+		sourceColumn: faixa_3h
+		sortByColumn: ordem
+
+	/// Agrupamento executivo SECUNDARIO (4 turnos).
+	column periodo_dia
+		dataType: string
+		lineageTag: af0ba96b-50e9-4b96-8663-8f1091d1f389
+		summarizeBy: none
+		sourceColumn: periodo_dia
+
+	column hora_inicio
+		dataType: int64
+		formatString: #,0
+		lineageTag: 2712d2c4-4677-4c2e-ac17-2ffc6ea20e7c
+		summarizeBy: none
+		sourceColumn: hora_inicio
+
+	column hora_fim
+		dataType: int64
+		formatString: #,0
+		lineageTag: 59684d1c-4020-4644-a09f-9a35179cf677
+		summarizeBy: none
+		sourceColumn: hora_fim
+
+	/// Usada só para ordenar faixa_3h cronologicamente (sortByColumn).
+	column ordem
+		dataType: int64
+		isHidden
+		formatString: #,0
+		lineageTag: 2e8e8e85-ec8b-439d-8b9c-be6b79fad808
+		summarizeBy: none
+		sourceColumn: ordem
+
+	partition DIM_FAIXA_HORARIA = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_FAIXA_HORARIA.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"faixa_3h", type text}, {"periodo_dia", type text}, {"hora_inicio", Int64.Type}, {"hora_fim", Int64.Type}, {"ordem", Int64.Type}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

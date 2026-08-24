@@ -1,0 +1,218 @@
+/// Referencia pre-agregada de ICA5/Gini/top-shares por ano e tipo de periodo (ano_fechado/ytd). FK para DIM_ANO.
+table MET_ANO
+	lineageTag: 56098de3-9108-4e3b-8aed-caf34379a6b3
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- Ano Fechado' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "ica5_pct",
+			        MET_ANO[tipo_periodo] = "ano_fechado"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 55cd5092-d91c-4075-b6e3-1abf371153e1
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- YTD' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "ica5_pct",
+			        MET_ANO[tipo_periodo] = "ytd"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: b262ab02-5ee5-428f-a5ba-1c3488aeca03
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- Ano Fechado' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "gini",
+			        MET_ANO[tipo_periodo] = "ano_fechado"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 7b2f07a3-1994-4997-9d89-09705828b0fe
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- YTD' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "gini",
+			        MET_ANO[tipo_periodo] = "ytd"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 174e31a4-47f7-4275-a9fc-603e85b28384
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- Ano Fechado' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top1_pct",
+			        MET_ANO[tipo_periodo] = "ano_fechado"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 26b21f2e-6375-49c1-9c26-e763890a8c72
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- YTD' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top1_pct",
+			        MET_ANO[tipo_periodo] = "ytd"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 5743ea6f-578a-4a3a-ae7b-5fffa441cc72
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- Ano Fechado' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top10_pct",
+			        MET_ANO[tipo_periodo] = "ano_fechado"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 4a81e9ba-35fe-4a4b-9eb7-3127624a8c8b
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- YTD' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top10_pct",
+			        MET_ANO[tipo_periodo] = "ytd"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 73605096-9001-43d3-a638-479a6782d8a8
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- Ano Fechado' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top20_pct",
+			        MET_ANO[tipo_periodo] = "ano_fechado"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 776bc91f-9427-402a-a18a-1a84400457c4
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- YTD' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_ANO,
+			        MET_ANO[metrica] = "top20_pct",
+			        MET_ANO[tipo_periodo] = "ytd"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_ANO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 23d27548-d90e-4921-8fd9-929687376ec1
+
+	/// FK para DIM_ANO[ano].
+	column ano
+		dataType: int64
+		formatString: 0
+		lineageTag: 884941be-cc2d-4df7-a079-d9f7ff7db980
+		summarizeBy: none
+		sourceColumn: ano
+
+	/// ano_fechado | ytd.
+	column tipo_periodo
+		dataType: string
+		lineageTag: 02d253ba-5edc-4d7c-aed4-5c4345b1eb30
+		summarizeBy: none
+		sourceColumn: tipo_periodo
+
+	/// Dominio fechado: ica5_pct, gini, top1_pct, top10_pct, top20_pct.
+	column metrica
+		dataType: string
+		lineageTag: c82c76f1-4797-4c20-9c6d-0488363e1795
+		summarizeBy: none
+		sourceColumn: metrica
+
+	/// Escala mista -- ver MET_UNIVERSO.
+	column valor
+		dataType: double
+		formatString: #,0.00000
+		lineageTag: 9a464e93-dbf5-438e-8627-fdfc21c9402c
+		summarizeBy: none
+		sourceColumn: valor
+
+	column n_voos_base
+		dataType: int64
+		formatString: #,0
+		lineageTag: d067ddba-012f-4b58-9564-6372c48e0d19
+		summarizeBy: none
+		sourceColumn: n_voos_base
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: ed4e7a65-3193-4c27-bfdf-15f987992ba0
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	column chave_grao
+		dataType: string
+		isHidden
+		lineageTag: 63d9894a-b5e8-4def-a10f-3deaf3a96e61
+		summarizeBy: none
+		sourceColumn: chave_grao
+
+	partition MET_ANO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_ANO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"ano", Int64.Type}, {"tipo_periodo", type text}, {"metrica", type text}, {"valor", type number}, {"n_voos_base", Int64.Type}, {"data_calculo", type datetime}, {"chave_grao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

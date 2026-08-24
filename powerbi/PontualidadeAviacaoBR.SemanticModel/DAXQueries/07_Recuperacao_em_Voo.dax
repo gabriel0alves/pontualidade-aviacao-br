@@ -1,0 +1,5 @@
+// Homologação 07 — Mediana de recuperação em voo (KPI7, elegibilidade completa).
+// Referência Python: -3,0000 min (mediana; negativo = atraso de chegada tende
+// a ser MENOR que o de partida -- recuperação parcial em voo, na mediana).
+EVALUATE
+ROW("Mediana Recuperação em Voo (KPI7)", [Mediana Recuperação em Voo (KPI7)])

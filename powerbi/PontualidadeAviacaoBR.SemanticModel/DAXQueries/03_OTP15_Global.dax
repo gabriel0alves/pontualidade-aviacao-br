@@ -1,0 +1,4 @@
+// Homologação 03 — OTP15 % global (KPI1).
+// Referência Python: 85,9344% (recomputado direto de voos.parquet nesta rodada).
+EVALUATE
+ROW("OTP15 %", [OTP15 %])

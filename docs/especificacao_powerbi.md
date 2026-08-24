@@ -177,7 +177,7 @@ FK órfã contra `FATO_VOO`/`FATO_CELULA_P11` para cada uma (ver §17).
 
 | Dimensão | Chave | Atributos | Cardinalidade (medida) |
 |---|---|---|---|
-| **`DIM_CALENDARIO`** | `data` (datetime64 normalizado à meia-noite, um dia por linha) | `ano` (FK → `DIM_ANO`), `mes`, `ano_mes`, `dia_semana`, `trimestre`, `flag_ytd_homologo` | 2.738 dias |
+| **`DIM_CALENDARIO`** | `data` (datetime64 normalizado à meia-noite, um dia por linha) | `ano` (FK → `DIM_ANO`), `mes`, `ano_mes`, `mes_inicio` *(nova, rodada de visuais — datetime64, primeiro dia do mês de cada linha, mesma cardinalidade mensal de `ano_mes`; existe para servir de eixo Contínuo em gráficos de série temporal mensal sem mudar a granularidade)*, `dia_semana`, `trimestre`, `flag_ytd_homologo` | 2.738 dias (90 meses distintos: 2019-01 a 2026-06) |
 | **`DIM_ANO`** *(nova, corrige a rodada anterior)* | `ano` (int) | `ano_parcial` (bool — CALCULADO a partir dos meses distintos observados por ano, mesma lógica de `04_universo.py` R9, não fixo "só 2026"), `regime_temporal` (de `REGIMES_TEMPORAIS`, lookup) | 8 valores (2019–2026) |
 | **`DIM_AEROPORTO`** | `icao` (código ICAO) | `descricao_canonica`, `qtd_descricoes_encontradas`, `flag_ambiguidade`, `descricao_mais_recente`, `data_ultima_observacao` (§5.1) | 292 códigos — **correção nesta rodada:** é o universo COMPLETO de `icao_origem` (não restrito a `atraso_valido`, que teria só 245); precisa ser o universo completo porque `FATO_VOO` tem esse grão e uma FK exigiria isso para 0 linhas órfãs (verificado, ver §17) |
 | **`DIM_COMPANHIA`** | `operadora_analitica` | `grupo_economico`, `caracteristica_operacional` | 6 valores |
@@ -409,8 +409,8 @@ antecipada aqui.
 | **KPI3 — mediana** | valor central | — | voos válidos |
 | **KPI4 — ICA5** | % concentrado nos 5% piores | Σ atraso 5% piores | Σ atraso > 0 |
 | **KPI5 — minutos acumulados** | soma do atraso positivo | — | — |
-| **KPI6 — cancelamento (headline D3)** | % cancelados, só passageiros | cancelados-passageiros | programados-passageiros |
-| **KPI6 — sensibilidade** | % cancelados, todos os segmentos | cancelados | programados |
+| **KPI6 — cancelamento (headline D3)** | % cancelados, só passageiros, com período (Decisão A) | cancelados-passageiros-com-período | programados-passageiros-com-período |
+| **KPI6 — sensibilidade** | % cancelados, todos os segmentos, com período (Decisão A) | cancelados-com-período | programados-com-período |
 | **KPI7 — recuperação em voo** | mediana(chegada−partida) | — | `atraso_chegada_valido=True` |
 | Cobertura dos dados | % com dado válido | voos válidos | voos programados |
 | Participação (voos/minutos) | share num recorte | ver §10.1 | ver §10.1 |
@@ -425,8 +425,8 @@ antecipada aqui.
 |---|---|---|
 | OTP15/KPI2/KPI3/KPI5/KPI9 | `atraso_valido = TRUE()` | não inclui CANCELADO nem NÃO INFORMADO |
 | ICA5/Gini | `atraso_valido = TRUE() AND atraso_partida_min > 0` | só atraso positivo entra no denominador (KPI4) |
-| KPI6 headline | `REMOVEFILTERS(DIM_SEGMENTO)` + `entra_headline_kpi6 = TRUE()`, aplicado **dentro da medida** (§10) | imune a slicer de segmento colocado na página por engano |
-| KPI6 sensibilidade | `REMOVEFILTERS(DIM_SEGMENTO)`, sem filtro de segmento | força sempre todos os 5 segmentos, mesmo com slicer ativo |
+| KPI6 headline | `REMOVEFILTERS(DIM_SEGMENTO)` + `entra_headline_kpi6 = TRUE()` + `KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())` (Decisão A), aplicado **dentro da medida** (§10) | imune a slicer de segmento colocado na página por engano; exclui ~92 mil voos sem período (ver `Cobertura Temporal KPI6 -- Headline %`) |
+| KPI6 sensibilidade | `REMOVEFILTERS(DIM_SEGMENTO)` + `KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())` (Decisão A), sem filtro de segmento | força sempre todos os 5 segmentos, mesmo com slicer ativo; exclui ~113 mil voos sem período (ver `Cobertura Temporal KPI6 -- Todos os Segmentos %`) |
 | KPI7 | `atraso_chegada_valido = TRUE()` | interseção completa dos 6 conjuntos — ver §13.3 para o que é/não é reconstruível |
 | Cobertura dos dados | numerador `atraso_valido=TRUE()`, denominador `situacao_voo IN {REALIZADO,CANCELADO}` | mede qualidade de dado, rótulo diferenciado obrigatório |
 
@@ -450,6 +450,24 @@ CALCULATE(
     [Voos Programados],
     REMOVEFILTERS(DIM_SEGMENTO),
     DIM_SEGMENTO[entra_headline_kpi6] = TRUE()
+)
+
+Voos Programados -- Passageiros (Com Período) =
+CALCULATE(
+    [Voos Programados -- Passageiros],
+    KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())
+)
+
+Voos Programados -- Todos os Segmentos =
+CALCULATE(
+    [Voos Programados],
+    REMOVEFILTERS(DIM_SEGMENTO)
+)
+
+Voos Programados -- Todos os Segmentos (Com Período) =
+CALCULATE(
+    [Voos Programados -- Todos os Segmentos],
+    KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())
 )
 
 Voos Válidos =
@@ -514,16 +532,52 @@ CALCULATE(
     DIM_SEGMENTO[entra_headline_kpi6] = TRUE()
 )
 
+Cancelamentos -- Passageiros (Com Período) =
+CALCULATE(
+    [Cancelamentos -- Passageiros],
+    KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())
+)
+
+Cancelamentos -- Todos os Segmentos =
+CALCULATE(
+    [Cancelamentos],
+    REMOVEFILTERS(DIM_SEGMENTO)
+)
+
+Cancelamentos -- Todos os Segmentos (Com Período) =
+CALCULATE(
+    [Cancelamentos -- Todos os Segmentos],
+    KEEPFILTERS(FATO_VOO[data_partida_prevista] <> BLANK())
+)
+
 Taxa de Cancelamento -- Headline =
 DIVIDE(
-    [Cancelamentos -- Passageiros],
-    [Voos Programados -- Passageiros]
+    [Cancelamentos -- Passageiros (Com Período)],
+    [Voos Programados -- Passageiros (Com Período)]
 )
 
 Taxa de Cancelamento -- Todos os Segmentos =
 DIVIDE(
-    CALCULATE([Cancelamentos], REMOVEFILTERS(DIM_SEGMENTO)),
-    CALCULATE([Voos Programados], REMOVEFILTERS(DIM_SEGMENTO))
+    [Cancelamentos -- Todos os Segmentos (Com Período)],
+    [Voos Programados -- Todos os Segmentos (Com Período)]
+)
+
+Voos Programados sem Período -- Headline =
+[Voos Programados -- Passageiros] - [Voos Programados -- Passageiros (Com Período)]
+
+Voos Programados sem Período -- Todos os Segmentos =
+[Voos Programados -- Todos os Segmentos] - [Voos Programados -- Todos os Segmentos (Com Período)]
+
+Cobertura Temporal KPI6 -- Headline % =
+DIVIDE(
+    [Voos Programados -- Passageiros (Com Período)],
+    [Voos Programados -- Passageiros]
+)
+
+Cobertura Temporal KPI6 -- Todos os Segmentos % =
+DIVIDE(
+    [Voos Programados -- Todos os Segmentos (Com Período)],
+    [Voos Programados -- Todos os Segmentos]
 )
 
 Mediana Recuperação em Voo (KPI7) =
@@ -543,7 +597,7 @@ CALCULATE(
 ```
 
 **Correção sobre a medida de cancelamento (Decisão 2 do usuário).** A
-medida `Taxa de Cancelamento -- Headline` agora é composta por duas medidas
+medida `Taxa de Cancelamento -- Headline` é composta por medidas
 auxiliares (`Voos Programados -- Passageiros`, `Cancelamentos --
 Passageiros`), cada uma aplicando `REMOVEFILTERS(DIM_SEGMENTO)` **antes** de
 reaplicar `entra_headline_kpi6 = TRUE()`. `REMOVEFILTERS` limpa
@@ -554,6 +608,36 @@ um filtro de segmento de fora. `Taxa de Cancelamento -- Todos os
 Segmentos` aplica a mesma disciplina na direção oposta: força a ausência de
 filtro de segmento, garantindo que a visão de sensibilidade do D3 sempre
 mostre os 5 segmentos, mesmo que a página tenha um slicer de segmento ativo.
+
+**Elegibilidade temporal do KPI6 (Decisão A, Rodada 7A, 2026-08-21).** A
+homologação encontrou as medidas `Taxa de Cancelamento -- Headline`/`--
+Todos os Segmentos` divergindo da referência Python
+(`06_bloco_b_temporal.py`) em −0,042428 pp e −0,055968 pp respectivamente —
+fora da tolerância de ±0,01 pp. Causa raiz: o Python calcula o KPI6 sobre
+`d = df.dropna(subset=["ano"])`, ou seja, exclui registros sem
+`partida_prevista`/`ano` **antes** de contar programados/cancelados; as
+medidas DAX não tinham esse filtro. Comprovou-se empiricamente, linha a
+linha contra `FATO_VOO.parquet` (5.452.295 linhas, 0 divergências), que
+`FATO_VOO[data_partida_prevista] <> BLANK()` é exatamente equivalente ao
+`ano.notna()` do Python — não foi escolhida por conveniência, é a única
+coluna do modelo com essa equivalência comprovada.
+
+Decisão A (aprovada): preservar a regra Python — o denominador e o
+numerador do KPI6 (headline e todos os segmentos) passam a excluir
+registros sem `data_partida_prevista`, **dentro das próprias medidas**
+(nunca por filtro de página ou de visual), via
+`Voos Programados -- Passageiros (Com Período)`,
+`Cancelamentos -- Passageiros (Com Período)` e seus equivalentes para a
+visão todos-os-segmentos. Isso reconcilia exatamente com a referência
+Python: 2,3871% (headline, 121.900/5.106.720) e 2,7120% (todos os
+segmentos, 144.778/5.338.365). Os registros excluídos (92.302 no headline,
+112.623 em todos os segmentos) ficam visíveis, nunca descartados
+silenciosamente, através de `Voos Programados sem Período --
+Headline`/`-- Todos os Segmentos` e `Cobertura Temporal KPI6 --
+Headline %`/`-- Todos os Segmentos %` (cobertura = programados com período
+/ programados antes da exclusão temporal → 98,2246% e 97,9339%). Este
+documento **não conclui** por que esses ~112 mil registros não têm
+`data_partida_prevista` — a causa não foi investigada nesta rodada.
 
 Nenhuma medida acima reimplementa `resolve_companhia()`, `MOTIVOS_
 INVALIDEZ_CHEGADA` ou corte de volume.
@@ -894,6 +978,19 @@ nunca motivo para alterar o valor Python.
 ---
 
 ## 13. Páginas, visuais, filtros e navegação
+
+**Status de implementação (atualizado após a rodada de visuais):** esta
+seção descreve o DESENHO-alvo das 7 páginas executivas. Delas, só
+`00 — Homologação` (técnica, fora desta matriz) e parte de
+`1 — Visão executiva` foram efetivamente construídas e homologadas no
+Power BI Desktop até agora — ver `docs/homologacao_powerbi_rodada7a.md`,
+seção "Gates manuais aprovados", para o que foi de fato validado
+visualmente. As páginas 2–7 permanecem só especificadas, não
+implementadas. Em `1 — Visão executiva`, a implementação real bateu com o
+desenho abaixo: o segmentador `MET_ANO` (linha "1. Visão executiva" desta
+tabela) é de fato single-select obrigatório e independente do slicer
+geral de `DIM_ANO`, e a mensagem de aviso foi implementada (texto exato:
+"ICA5 e Gini estão disponíveis para apenas um ano fechado por vez.").
 
 ### 13.1 Matriz página × fato × slicers
 
@@ -1237,9 +1334,36 @@ verificação visual próprios, quando isso for pedido explicitamente.
     as tabelas de consumo, ANTES do `.pbix` — `src/10_exportar_powerbi.py`,
     19 tabelas, sem duplicar cálculo entre scripts (funções compartilhadas
     extraídas para `src/metricas_compartilhadas.py`).
+12. **Aprovada e implementada numa rodada posterior:** projeto **PBIP**
+    (não `.pbix`) criado nativamente pelo Power BI Desktop — modelo
+    semântico TMDL completo + página técnica `00 — Homologação` + início
+    da página `1 — Visão executiva`. Correções e adições feitas nessa
+    rodada, todas validadas em gate manual no Desktop (ver
+    `docs/homologacao_powerbi_rodada7a.md`, seção "Gates manuais
+    aprovados"):
+    - cartão de contagem convertido de `cardVisual` (moderno) para `card`
+      (clássico) — único jeito nativo de exibir número completo sem
+      abreviação nesse tipo de cartão;
+    - bug sistêmico de escala percentual (`formatString: 0.00\%`, que
+      **suprime** a multiplicação por 100 do placeholder `%`) auditado em
+      todas as 43 medidas percentuais do modelo e corrigido nas 12 que
+      retornam proporção 0–1 (`docs/auditoria_formatos_percentuais_powerbi.md`);
+    - dois segmentadores de ano com escopos independentes
+      (`DIM_ANO[ano]` vs. `MET_ANO[ano]`, isolados por
+      `visualInteractions`), satisfazendo a seleção única obrigatória do
+      §13.1/decisão 10 para o cartão `MET_ANO`;
+    - filtros "não está em branco" nos 3 segmentadores aplicáveis;
+    - nova coluna `DIM_CALENDARIO[mes_inicio]` (datetime, primeiro dia do
+      mês) para permitir eixo Contínuo em gráfico de série temporal, sem
+      alterar a granularidade mensal já usada por `ano_mes`;
+    - gráfico de linha OTP15 (eixo primário) × cancelamento (eixo
+      secundário) ao longo do tempo, título/legenda visíveis, subtítulo
+      automático oculto.
+    Páginas 2–7 do §13 permanecem não implementadas.
 
-**Fechamento desta rodada:** nenhum `.pbix`, `.pbit` ou projeto Power BI
-foi criado. O que foi implementado nesta rodada é a camada de exportação
-Python (tabelas de consumo + seus contratos de teste) — a construção
-visual do `.pbix`/Power Query fica para um commit futuro, por instrução
-explícita do usuário.
+**Fechamento da rodada de exportação Python:** nenhum `.pbix`/`.pbit`
+havia sido criado até essa rodada — só a camada de exportação Python
+(tabelas de consumo + contratos de teste). A construção visual (decisão
+12 acima) veio numa rodada posterior, também por instrução explícita do
+usuário, e permanece parcial (só `00 — Homologação` e parte de
+`1 — Visão executiva`).

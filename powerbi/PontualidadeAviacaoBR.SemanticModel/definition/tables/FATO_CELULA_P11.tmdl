@@ -1,0 +1,171 @@
+/// Fato pre-agregado: 1 linha = 1 celula (icao_origem, faixa_3h) na janela de 12 meses do ranking P11 (decisao D5).
+table FATO_CELULA_P11
+	lineageTag: c60183bf-7428-4649-b24f-4d52916af65a
+
+	/// Esperado: 625.
+	measure 'Linhas Carregadas -- FATO_CELULA_P11' = COUNTROWS(FATO_CELULA_P11)
+		formatString: #,0
+		displayFolder: Homologação
+		lineageTag: 44c7d070-5017-4fd5-a10a-de7cb08b5f5e
+
+	/// FK para DIM_AEROPORTO[icao].
+	column icao_origem
+		dataType: string
+		displayFolder: Identificação
+		lineageTag: b3c5b194-363d-4bd2-a50e-700e0ead46f3
+		summarizeBy: none
+		sourceColumn: icao_origem
+
+	/// FK para DIM_FAIXA_HORARIA[faixa_3h].
+	column faixa_3h
+		dataType: string
+		displayFolder: Identificação
+		lineageTag: eed34204-275c-4852-892c-8e8416254a63
+		summarizeBy: none
+		sourceColumn: faixa_3h
+
+	column volume_valido
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: 3e205767-b744-438e-92df-44b93e737e5b
+		summarizeBy: none
+		sourceColumn: volume_valido
+
+	/// Ja em escala 0-100.
+	column otp15_pct
+		dataType: double
+		formatString: 0.00\%
+		displayFolder: Métricas
+		lineageTag: 7e74ea14-34e1-4457-af93-783a7c10dccf
+		summarizeBy: none
+		sourceColumn: otp15_pct
+
+	column mediana_atraso_min
+		dataType: double
+		formatString: #,0.00
+		displayFolder: Métricas
+		lineageTag: 8aa8fa10-899d-4937-b44e-ce5b4e1f1a28
+		summarizeBy: none
+		sourceColumn: mediana_atraso_min
+
+	column minutos_acumulados
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: db19826c-ac91-4630-9c41-a7160974b082
+		summarizeBy: none
+		sourceColumn: minutos_acumulados
+
+	column volume_realizado
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: 8ccd9d14-f98e-4a41-b14c-938da4760538
+		summarizeBy: none
+		sourceColumn: volume_realizado
+
+	/// Ja em escala 0-100.
+	column cobertura_partidas_validas_pct
+		dataType: double
+		formatString: 0.00\%
+		displayFolder: Métricas
+		lineageTag: 8158c484-98f8-4caa-8e74-2404062715f9
+		summarizeBy: none
+		sourceColumn: cobertura_partidas_validas_pct
+
+	column volume_programado
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: cf732579-6dea-4df1-ba2b-7c16dc5b62a1
+		summarizeBy: none
+		sourceColumn: volume_programado
+
+	column cancelados
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: b2a926f2-f309-4f68-b553-a536eadc1ca5
+		summarizeBy: none
+		sourceColumn: cancelados
+
+	/// Ja em escala 0-100.
+	column taxa_cancelamento_pct
+		dataType: double
+		formatString: 0.00\%
+		displayFolder: Métricas
+		lineageTag: 2be831ab-33f2-4205-9f51-313c677ab6ea
+		summarizeBy: none
+		sourceColumn: taxa_cancelamento_pct
+
+	column meses_operacao
+		dataType: int64
+		formatString: #,0
+		displayFolder: Métricas
+		lineageTag: fa96b5eb-b995-4e77-b943-68f3bee394ff
+		summarizeBy: none
+		sourceColumn: meses_operacao
+
+	column operadora_principal
+		dataType: string
+		displayFolder: Métricas
+		lineageTag: 69151605-cd27-4c5f-b92c-ad9890aadac9
+		summarizeBy: none
+		sourceColumn: operadora_principal
+
+	/// Ja em escala 0-100.
+	column participacao_operadora_principal_pct
+		dataType: double
+		formatString: 0.00\%
+		displayFolder: Métricas
+		lineageTag: 93c5a669-fbb5-487c-a063-06fed37ac6e1
+		summarizeBy: none
+		sourceColumn: participacao_operadora_principal_pct
+
+	/// Ja em escala 0-100 (pontos percentuais).
+	column delta_otp15_subperiodos_pp
+		dataType: double
+		formatString: 0.00\%
+		displayFolder: Métricas
+		lineageTag: 63b29d50-a6eb-469e-b02c-5025d2f4df25
+		summarizeBy: none
+		sourceColumn: delta_otp15_subperiodos_pp
+
+	/// Criterios 1-3 (volume/cobertura/meses) -- so estes EXCLUEM do ranking.
+	column elegivel
+		dataType: boolean
+		displayFolder: Elegibilidade
+		lineageTag: 7e65d283-5fd7-485a-babf-4b4db725cd30
+		summarizeBy: none
+		sourceColumn: elegivel
+
+	/// Criterio 4 -- so FLAG, nunca exclui.
+	column flag_instavel
+		dataType: boolean
+		displayFolder: Elegibilidade
+		lineageTag: d34bc1fb-eb2b-4007-9f7c-ecd0aad80658
+		summarizeBy: none
+		sourceColumn: flag_instavel
+
+	/// Criterio 5 -- so FLAG, nunca exclui.
+	column flag_concentrada_em_1_operadora
+		dataType: boolean
+		displayFolder: Elegibilidade
+		lineageTag: 74d27203-5602-4463-b375-d52a253ae4ad
+		summarizeBy: none
+		sourceColumn: flag_concentrada_em_1_operadora
+
+	partition FATO_CELULA_P11 = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\FATO_CELULA_P11.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"icao_origem", type text}, {"faixa_3h", type text}, {"volume_valido", Int64.Type}, {"otp15_pct", type number}, {"mediana_atraso_min", type number}, {"minutos_acumulados", Int64.Type}, {"volume_realizado", Int64.Type}, {"cobertura_partidas_validas_pct", type number}, {"volume_programado", Int64.Type}, {"cancelados", Int64.Type}, {"taxa_cancelamento_pct", type number}, {"meses_operacao", Int64.Type}, {"operadora_principal", type text}, {"participacao_operadora_principal_pct", type number}, {"delta_otp15_subperiodos_pp", type number}, {"elegivel", type logical}, {"flag_instavel", type logical}, {"flag_concentrada_em_1_operadora", type logical}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

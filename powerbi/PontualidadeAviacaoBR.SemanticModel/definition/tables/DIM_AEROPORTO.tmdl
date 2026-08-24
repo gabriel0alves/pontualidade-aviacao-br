@@ -1,0 +1,59 @@
+/// Dimensao de aeroporto de origem. Unica relacao de aeroporto na v1 -- destino removido do modelo (ver especificacao §5).
+table DIM_AEROPORTO
+	lineageTag: 11a20f5e-9ed5-4538-953f-01a4b7cd5cb9
+
+	/// Chave da dimensao. Universo COMPLETO de icao_origem (nao restrito a atraso_valido) -- necessario para 0 FKs orfas contra FATO_VOO.
+	column icao
+		dataType: string
+		lineageTag: 371e3152-4597-4573-afea-d1b0bfa4b66c
+		summarizeBy: none
+		sourceColumn: icao
+
+	/// Descricao mais frequente no periodo (ano_mes) mais recente em que o codigo aparece -- algoritmo deterministico, ver especificacao secao 5.1.
+	column descricao_canonica
+		dataType: string
+		lineageTag: 9f04f40d-b5a0-4b0d-997b-e0b4e97b6200
+		summarizeBy: none
+		sourceColumn: descricao_canonica
+
+	column qtd_descricoes_encontradas
+		dataType: int64
+		formatString: #,0
+		lineageTag: c7a90dd7-8559-4e7b-888a-6d03c3442605
+		summarizeBy: none
+		sourceColumn: qtd_descricoes_encontradas
+
+	/// qtd_descricoes_encontradas > 1.
+	column flag_ambiguidade
+		dataType: boolean
+		lineageTag: 8d415ab4-8b5c-4391-b2c3-11d86827c520
+		summarizeBy: none
+		sourceColumn: flag_ambiguidade
+
+	/// Pode divergir da canonica -- ver AUDITORIA_DESCRICAO_AEROPORTO.
+	column descricao_mais_recente
+		dataType: string
+		lineageTag: cb217d81-2118-438c-a15e-5304781ef662
+		summarizeBy: none
+		sourceColumn: descricao_mais_recente
+
+	column data_ultima_observacao
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 91f11ff8-ce38-46fe-8a44-a3a7b2c0db72
+		summarizeBy: none
+		sourceColumn: data_ultima_observacao
+
+	partition DIM_AEROPORTO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_AEROPORTO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"icao", type text}, {"descricao_canonica", type text}, {"qtd_descricoes_encontradas", Int64.Type}, {"flag_ambiguidade", type logical}, {"descricao_mais_recente", type text}, {"data_ultima_observacao", type datetime}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

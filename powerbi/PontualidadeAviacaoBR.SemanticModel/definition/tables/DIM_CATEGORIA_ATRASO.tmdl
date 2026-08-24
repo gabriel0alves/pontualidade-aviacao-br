@@ -1,0 +1,50 @@
+/// Dimensao de categoria de atraso de partida (R6) -- faixa 'Pontual' simetrica em torno de zero.
+table DIM_CATEGORIA_ATRASO
+	lineageTag: 68aa20f0-dc5e-4289-ad2b-d91c467a2ac7
+
+	/// Chave da dimensao. Faixa 'Pontual' e SIMETRICA em torno de zero (R6).
+	column categoria_atraso
+		dataType: string
+		lineageTag: 8d5f6e6d-e942-480c-ac27-409b8a5ea5bf
+		summarizeBy: none
+		sourceColumn: categoria_atraso
+		sortByColumn: ordem
+
+	/// Usada só para ordenar categoria_atraso (sortByColumn).
+	column ordem
+		dataType: int64
+		isHidden
+		formatString: #,0
+		lineageTag: 4a906a4a-cfb0-4d23-813b-d485617352ba
+		summarizeBy: none
+		sourceColumn: ordem
+
+	/// NULL quando o limite original era -infinito (categoria 'Antecipado').
+	column limite_inferior_min
+		dataType: double
+		formatString: #,0
+		lineageTag: 73b3fa9c-3364-4cc0-bca0-763b6ff10e49
+		summarizeBy: none
+		sourceColumn: limite_inferior_min
+
+	/// NULL quando o limite original era +infinito (categoria 'Atraso > 60').
+	column limite_superior_min
+		dataType: double
+		formatString: #,0
+		lineageTag: 54163495-78b4-4ca6-abd4-08e8c6015965
+		summarizeBy: none
+		sourceColumn: limite_superior_min
+
+	partition DIM_CATEGORIA_ATRASO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_CATEGORIA_ATRASO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"categoria_atraso", type text}, {"ordem", Int64.Type}, {"limite_inferior_min", type number}, {"limite_superior_min", type number}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

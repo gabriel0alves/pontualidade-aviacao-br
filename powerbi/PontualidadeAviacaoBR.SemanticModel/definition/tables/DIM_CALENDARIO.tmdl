@@ -1,0 +1,80 @@
+/// Dimensao de calendario. 1 linha = 1 dia, [JANELA_INICIO, JANELA_FIM), sem lacunas.
+table DIM_CALENDARIO
+	lineageTag: e7e9c869-7b57-422d-b780-00c05302f740
+
+	/// Chave da dimensao (1 dia por linha). Cobre [JANELA_INICIO, JANELA_FIM) sem lacunas.
+	column data
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 9a221ef6-362a-4866-a38b-e82f7bad8ade
+		summarizeBy: none
+		sourceColumn: data
+
+	/// FK para DIM_ANO[ano].
+	column ano
+		dataType: int64
+		formatString: #,0
+		lineageTag: 508448f1-7f97-4d3c-ba86-4649411985c9
+		summarizeBy: none
+		sourceColumn: ano
+
+	column mes
+		dataType: int64
+		formatString: #,0
+		lineageTag: 175556d6-4f0e-4d61-988a-6af5c07ae764
+		summarizeBy: none
+		sourceColumn: mes
+
+	/// Formato "YYYY-MM" -- ordena corretamente como texto.
+	column ano_mes
+		dataType: string
+		lineageTag: 60a31758-08f1-4752-a6b0-c78815ece318
+		summarizeBy: none
+		sourceColumn: ano_mes
+
+	/// 0=segunda .. 6=domingo (pandas dayofweek).
+	column dia_semana
+		dataType: int64
+		formatString: #,0
+		lineageTag: 9bba4a01-9d20-4c10-97e0-870e9556ffb5
+		summarizeBy: none
+		sourceColumn: dia_semana
+
+	column trimestre
+		dataType: int64
+		formatString: #,0
+		lineageTag: 7a093491-932e-4d13-b9fc-a5f629dda499
+		summarizeBy: none
+		sourceColumn: trimestre
+
+	/// mes <= MESES_YTD (regras.py) -- usado nas comparacoes YTD homologas.
+	column flag_ytd_homologo
+		dataType: boolean
+		lineageTag: 2e5631f4-a833-474f-961e-d49fee97da48
+		summarizeBy: none
+		sourceColumn: flag_ytd_homologo
+
+	/// Primeiro dia do mes de cada linha (mesmo valor para todos os dias do
+	/// mes) -- contraparte tipada-como-data de ano_mes, usada como eixo
+	/// Continuo em series temporais mensais sem mudar a granularidade
+	/// (1 ponto por mes, igual a ano_mes).
+	column mes_inicio
+		dataType: dateTime
+		formatString: yyyy-mm
+		lineageTag: 3f8a2c1e-6b4d-4a9f-9c2e-7d1b5e8f0a3c
+		summarizeBy: none
+		sourceColumn: mes_inicio
+
+	partition DIM_CALENDARIO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_CALENDARIO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"data", type datetime}, {"ano", Int64.Type}, {"mes", Int64.Type}, {"ano_mes", type text}, {"mes_inicio", type datetime}, {"dia_semana", Int64.Type}, {"trimestre", Int64.Type}, {"flag_ytd_homologo", type logical}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

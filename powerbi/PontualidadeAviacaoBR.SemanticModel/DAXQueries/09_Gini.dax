@@ -1,0 +1,4 @@
+// Homologação 09 — Coeficiente de Gini do impacto (escopo universo).
+// Referência Python: 0,865688 (eda_bloco_d.md D.4: "0.8657").
+EVALUATE
+ROW("Gini -- Universo", [Gini -- Universo])

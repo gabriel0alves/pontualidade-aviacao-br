@@ -1,0 +1,12 @@
+// Homologação 16 — Curva de Lorenz: endpoints (percentil_voos = 0 e 100).
+// Referência Python: (0, 0) e (100, 100) exatos, por construção
+// (curva_lorenz() em metricas_compartilhadas.py) -- testado em
+// tests/test_metricas_compartilhadas.py e tests/test_exportacao_powerbi.py.
+// Confirma também monotonicidade visualmente ao trocar o filtro por
+// "percentil_voos >= 0" (linha completa, 101 pontos).
+EVALUATE
+FILTER(
+    FATO_CURVA_LORENZ,
+    FATO_CURVA_LORENZ[percentil_voos] = 0 || FATO_CURVA_LORENZ[percentil_voos] = 100
+)
+ORDER BY FATO_CURVA_LORENZ[percentil_voos]

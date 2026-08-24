@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "PontualidadeAviacaoBR"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "fc3f081d-4986-44bc-95bd-347314444b79"
+  }
+}

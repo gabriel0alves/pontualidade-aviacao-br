@@ -1,0 +1,130 @@
+/// Referencia pre-agregada de ICA5/Gini/top-shares pelos 12 maiores aeroportos. FK para DIM_AEROPORTO.
+table MET_AEROPORTO
+	lineageTag: 0af76dab-081c-4ec8-8a95-196d63e96b00
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- Aeroporto' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_AEROPORTO,
+			        MET_AEROPORTO[metrica] = "ica5_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_AEROPORTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 399ff987-97cb-46ce-a60f-7d2ce3023891
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- Aeroporto' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_AEROPORTO,
+			        MET_AEROPORTO[metrica] = "gini"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_AEROPORTO[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 4b950feb-4df3-4c84-83ec-eb02167f204a
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- Aeroporto' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_AEROPORTO,
+			        MET_AEROPORTO[metrica] = "top1_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_AEROPORTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 1fbbafcb-2a32-4be3-8aea-de7191b75adf
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- Aeroporto' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_AEROPORTO,
+			        MET_AEROPORTO[metrica] = "top10_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_AEROPORTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: b9f95b2f-ef39-4d06-b371-a249703a06a9
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- Aeroporto' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_AEROPORTO,
+			        MET_AEROPORTO[metrica] = "top20_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_AEROPORTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 0f883fdb-394e-4f4a-a170-7cdd49b027d7
+
+	/// FK para DIM_AEROPORTO[icao]. So os TOP_N_AEROPORTOS=12 maiores por volume.
+	column icao
+		dataType: string
+		lineageTag: b78860b6-14b9-466e-9157-36b8d1ad41e5
+		summarizeBy: none
+		sourceColumn: icao
+
+	/// Dominio fechado: ica5_pct, gini, top1_pct, top10_pct, top20_pct.
+	column metrica
+		dataType: string
+		lineageTag: b07b2d11-0b66-4c1e-9f67-38c736a22bed
+		summarizeBy: none
+		sourceColumn: metrica
+
+	/// Escala mista -- ver MET_UNIVERSO.
+	column valor
+		dataType: double
+		formatString: #,0.00000
+		lineageTag: 12b7f2ff-bf42-4129-baac-8468b84ec008
+		summarizeBy: none
+		sourceColumn: valor
+
+	column n_voos_base
+		dataType: int64
+		formatString: #,0
+		lineageTag: e249de3b-35b3-450b-9f53-665006ab7def
+		summarizeBy: none
+		sourceColumn: n_voos_base
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: de8802f4-a228-41fe-bc3c-3792a0fc21eb
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	column chave_grao
+		dataType: string
+		isHidden
+		lineageTag: a819a96e-348f-4041-a016-5ea968236ddf
+		summarizeBy: none
+		sourceColumn: chave_grao
+
+	partition MET_AEROPORTO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_AEROPORTO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"icao", type text}, {"metrica", type text}, {"valor", type number}, {"n_voos_base", Int64.Type}, {"data_calculo", type datetime}, {"chave_grao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

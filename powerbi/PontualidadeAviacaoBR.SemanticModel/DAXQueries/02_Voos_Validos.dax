@@ -1,0 +1,4 @@
+// Homologação 02 — Voos Válidos (R∩P∩Lp = atraso_valido).
+// Referência Python: 5.193.012.
+EVALUATE
+ROW("Voos Válidos", [Voos Válidos])

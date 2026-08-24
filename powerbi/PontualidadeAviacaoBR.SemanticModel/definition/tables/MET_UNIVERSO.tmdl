@@ -1,0 +1,124 @@
+/// Referencia pre-agregada de ICA5/Gini/top-shares, escopo universo completo. Tabela DESCONECTADA -- 5 linhas fixas.
+table MET_UNIVERSO
+	lineageTag: 3d68a848-0100-46f0-a3c7-1716a068552d
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- Universo' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_UNIVERSO,
+			        MET_UNIVERSO[metrica] = "ica5_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_UNIVERSO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: f4babe55-483d-462d-bfa7-490f62f191bf
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- Universo' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_UNIVERSO,
+			        MET_UNIVERSO[metrica] = "gini"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_UNIVERSO[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 4d485804-42c7-4004-8d70-3cf01b879354
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- Universo' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_UNIVERSO,
+			        MET_UNIVERSO[metrica] = "top1_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_UNIVERSO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 53347758-d3b5-45d8-83dc-015e8ae411ae
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- Universo' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_UNIVERSO,
+			        MET_UNIVERSO[metrica] = "top10_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_UNIVERSO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 9fd87e74-a0e3-4688-8db8-ee46793c3e0a
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- Universo' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_UNIVERSO,
+			        MET_UNIVERSO[metrica] = "top20_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_UNIVERSO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: d61dba5c-66be-4fad-8454-77c15dc7477f
+
+	/// Dominio fechado: ica5_pct, gini, top1_pct, top10_pct, top20_pct.
+	column metrica
+		dataType: string
+		lineageTag: b58f7997-1563-4a9d-943e-c5499e22a2cb
+		summarizeBy: none
+		sourceColumn: metrica
+
+	/// ATENCAO: escala mista -- gini e 0-1, as demais metricas ja sao 0-100. NAO formatar como percentual aqui; ver medidas dedicadas.
+	column valor
+		dataType: double
+		formatString: #,0.00000
+		lineageTag: 66b2b638-b69b-4035-beac-b31f0640d603
+		summarizeBy: none
+		sourceColumn: valor
+
+	column n_voos_base
+		dataType: int64
+		formatString: #,0
+		lineageTag: 990bb4eb-72a2-40d9-ac5a-9e45a1480949
+		summarizeBy: none
+		sourceColumn: n_voos_base
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: b01ffe9a-a30e-4f29-b32b-52cba612dc86
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	/// Chave de unicidade tecnica -- concatenacao de metrica (grao unico aqui).
+	column chave_grao
+		dataType: string
+		isHidden
+		lineageTag: 0e9c3b3d-331c-40cb-873e-0798bb7ae67e
+		summarizeBy: none
+		sourceColumn: chave_grao
+
+	partition MET_UNIVERSO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_UNIVERSO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"metrica", type text}, {"valor", type number}, {"n_voos_base", Int64.Type}, {"data_calculo", type datetime}, {"chave_grao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

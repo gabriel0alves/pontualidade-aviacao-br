@@ -1,0 +1,77 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "d93151d6a8eaf7123069",
+  "position": {
+    "x": 1600,
+    "y": 620,
+    "z": 4000,
+    "height": 230,
+    "width": 320,
+    "tabOrder": 4000
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DIM_AEROPORTO"
+                    }
+                  },
+                  "Property": "icao"
+                }
+              },
+              "queryRef": "DIM_AEROPORTO.icao",
+              "nativeQueryRef": "icao",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "data": [
+        {
+          "properties": {
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Dropdown'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {}
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "2138c2f210966b1496b2",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "DIM_AEROPORTO"
+              }
+            },
+            "Property": "icao"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

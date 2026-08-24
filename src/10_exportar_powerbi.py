@@ -137,12 +137,19 @@ def constroi_dim_calendario() -> pd.DataFrame:
     Grao: 1 linha = 1 dia, cobrindo [JANELA_INICIO, JANELA_FIM) (R2,
     regras.py) -- SEM lacunas por construcao (date_range, nao depende de
     quais dias tem voo observado). Chave: `data`.
+
+    `mes_inicio` = primeiro dia do mes de cada linha (mesmo valor repetido
+    para todos os dias de um mes) -- contraparte tipada-como-data de
+    `ano_mes` (string), usada como eixo Continuo em visuais de serie
+    temporal mensal sem alterar a granularidade (1 ponto por mes,
+    idem ano_mes).
     """
     dias = pd.date_range(JANELA_INICIO, JANELA_FIM - pd.Timedelta(days=1), freq="D")
     dim = pd.DataFrame({"data": dias})
     dim["ano"] = dias.year
     dim["mes"] = dias.month
     dim["ano_mes"] = dias.strftime("%Y-%m")
+    dim["mes_inicio"] = dias.to_period("M").to_timestamp()
     dim["dia_semana"] = dias.dayofweek
     dim["trimestre"] = dias.quarter
     dim["flag_ytd_homologo"] = dim["mes"] <= MESES_YTD

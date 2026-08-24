@@ -1,0 +1,12 @@
+// Homologação 11 — YTD homólogo de 2026 (jan-jun, DIM_CALENDARIO[flag_ytd_homologo]).
+// 2026 é ano PARCIAL -- nunca comparar com ano fechado sem este filtro.
+// Referência Python: Voos Válidos = 389.066; OTP15 % = 84,5270%.
+EVALUATE
+CALCULATETABLE(
+    ROW(
+        "Voos Válidos", [Voos Válidos],
+        "OTP15 %", [OTP15 %]
+    ),
+    DIM_ANO[ano] = 2026,
+    DIM_CALENDARIO[flag_ytd_homologo] = TRUE()
+)

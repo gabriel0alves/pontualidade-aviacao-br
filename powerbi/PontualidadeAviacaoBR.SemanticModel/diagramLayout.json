@@ -1,0 +1,282 @@
+{
+  "version": "1.1.0",
+  "diagrams": [
+    {
+      "ordinal": 0,
+      "scrollPosition": {
+        "x": 0,
+        "y": 0
+      },
+      "nodes": [
+        {
+          "location": {
+            "x": 1848.6777520324035,
+            "y": 735.43198573897826
+          },
+          "nodeIndex": "_HOMOLOGACAO_PYTHON",
+          "nodeLineageTag": "933f77a1-6498-44cd-bc5f-c1c5e1b7490c",
+          "size": {
+            "height": 248,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 2132.6777520324035,
+            "y": 759.43198573897826
+          },
+          "nodeIndex": "AUDITORIA_DESCRICAO_AEROPORTO",
+          "nodeLineageTag": "2fad1481-2f4d-4f25-9f43-10ac4c9f71f4",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1325.1572987103359,
+            "y": 1088.3546933418872
+          },
+          "nodeIndex": "DIM_AEROPORTO",
+          "nodeLineageTag": "11a20f5e-9ed5-4538-953f-01a4b7cd5cb9",
+          "size": {
+            "height": 224,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 145.54008928856229,
+            "y": 288.28358747467337
+          },
+          "nodeIndex": "DIM_ANO",
+          "nodeLineageTag": "f40943ca-1824-4bf2-8d11-187e389bfaac",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 50,
+            "y": -10.617713857494437
+          },
+          "nodeIndex": "DIM_CALENDARIO",
+          "nodeLineageTag": "e7e9c869-7b57-422d-b780-00c05302f740",
+          "size": {
+            "height": 248,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 692.62343614346923,
+            "y": 220.86802893727304
+          },
+          "nodeIndex": "DIM_CATEGORIA_ATRASO",
+          "nodeLineageTag": "68aa20f0-dc5e-4289-ad2b-d91c467a2ac7",
+          "size": {
+            "height": 176,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 747.56031116373174,
+            "y": 1009.7628569985829
+          },
+          "nodeIndex": "DIM_COMPANHIA",
+          "nodeLineageTag": "1c8f780f-52cb-4b93-b22c-ae11d0617133",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1225.4863178225166,
+            "y": 599.45460949058088
+          },
+          "nodeIndex": "DIM_FAIXA_HORARIA",
+          "nodeLineageTag": "ca720c30-b226-4b36-9f9e-7e8c1c9523c0",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 432.06683300450379,
+            "y": 451.32904157330677
+          },
+          "nodeIndex": "DIM_MOTIVO_INVALIDEZ_CHEGADA",
+          "nodeLineageTag": "c1858126-5019-4e0b-a38f-03a4e0034b17",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 982.06556071503417,
+            "y": 305.75654389649276
+          },
+          "nodeIndex": "DIM_SEGMENTO",
+          "nodeLineageTag": "65947174-b682-4096-bec6-40d97b7ee032",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 458.89551418055703,
+            "y": 862.69177587890817
+          },
+          "nodeIndex": "DIM_SITUACAO_VOO",
+          "nodeLineageTag": "f356664a-12a0-4b67-aba7-b7e2a8eb3552",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1614.6777520324035,
+            "y": 1008.8149780824943
+          },
+          "nodeIndex": "FATO_CELULA_P11",
+          "nodeLineageTag": "c60183bf-7428-4649-b24f-4d52916af65a",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 2416.6777520324035,
+            "y": 759.43198573897826
+          },
+          "nodeIndex": "FATO_CURVA_LORENZ",
+          "nodeLineageTag": "aa130599-2f4e-4925-b3c0-f5c378ebcd84",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 748.60612854033275,
+            "y": 513.59050678706558
+          },
+          "nodeIndex": "FATO_VOO",
+          "nodeLineageTag": "ff946855-77ff-4f74-9872-7c6b525e7b9d",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1557.1341709095746,
+            "y": 1368.8639714779565
+          },
+          "nodeIndex": "MET_AEROPORTO",
+          "nodeLineageTag": "0af76dab-081c-4ec8-8a95-196d63e96b00",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1037.1532867764058,
+            "y": 854.03011024339537
+          },
+          "nodeIndex": "MET_ANO",
+          "nodeLineageTag": "56098de3-9108-4e3b-8aed-caf34379a6b3",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 2700.6777520324035,
+            "y": 709.43198573897826
+          },
+          "nodeIndex": "MET_H2_VARIANCIA",
+          "nodeLineageTag": "c8cb1ae3-1286-44d3-b66a-ac70cce62a90",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 619.435595192977,
+            "y": 1217.5628170944108
+          },
+          "nodeIndex": "MET_OPERADORA",
+          "nodeLineageTag": "54625931-a899-4641-81b9-e7c267eb894e",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1230.0820214086925,
+            "y": -50
+          },
+          "nodeIndex": "MET_SEGMENTO",
+          "nodeLineageTag": "a022c52d-8774-4ec4-824d-c1d461c1afe7",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 2984.6777520324035,
+            "y": 709.43198573897826
+          },
+          "nodeIndex": "MET_UNIVERSO",
+          "nodeLineageTag": "3d68a848-0100-46f0-a3c7-1716a068552d",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        }
+      ],
+      "name": "Todas as tabelas",
+      "zoomValue": 100,
+      "pinKeyFieldsToTop": false,
+      "showExtraHeaderInfo": false,
+      "hideKeyFieldsWhenCollapsed": false,
+      "tablesLocked": false
+    }
+  ],
+  "selectedDiagram": "Todas as tabelas",
+  "defaultDiagram": "Todas as tabelas"
+}

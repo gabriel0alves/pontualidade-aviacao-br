@@ -1,0 +1,15 @@
+// Homologação 17 — Cobertura temporal do KPI6 (decisão A, Rodada 7A).
+//
+// Mostra quanto do denominador de cada visão do KPI6 (05: headline; 06:
+// todos os segmentos) sobrevive à exclusão de registros sem
+// data_partida_prevista. Cobertura = programados com período / programados
+// antes da exclusão temporal.
+// Referência Python: 17a (headline) = 98,2246% (5.106.720 / 5.199.022);
+//                     17b (todos os segmentos) = 97,9339% (5.338.365 / 5.450.988).
+EVALUATE
+ROW(
+    "Voos Programados sem Período -- Headline", [Voos Programados sem Período -- Headline],
+    "Cobertura Temporal KPI6 -- Headline %", [Cobertura Temporal KPI6 -- Headline %],
+    "Voos Programados sem Período -- Todos os Segmentos", [Voos Programados sem Período -- Todos os Segmentos],
+    "Cobertura Temporal KPI6 -- Todos os Segmentos %", [Cobertura Temporal KPI6 -- Todos os Segmentos %]
+)

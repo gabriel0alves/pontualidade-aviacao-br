@@ -1,0 +1,38 @@
+model Model
+	culture: pt-BR
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: pt-BR
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_ProTooling = ["DevMode","DaxQueryView_Desktop"]
+
+annotation PBI_QueryOrder = ["AUDITORIA_DESCRICAO_AEROPORTO","DIM_AEROPORTO","DIM_ANO","DIM_CALENDARIO","DIM_CATEGORIA_ATRASO","DIM_COMPANHIA","DIM_FAIXA_HORARIA","DIM_MOTIVO_INVALIDEZ_CHEGADA","DIM_SEGMENTO","DIM_SITUACAO_VOO","FATO_CELULA_P11","FATO_CURVA_LORENZ","FATO_VOO","MET_AEROPORTO","MET_ANO","MET_H2_VARIANCIA","MET_OPERADORA","MET_SEGMENTO","MET_UNIVERSO","_HOMOLOGACAO_PYTHON","pPowerBIDataRoot"]
+
+ref table AUDITORIA_DESCRICAO_AEROPORTO
+ref table DIM_AEROPORTO
+ref table DIM_ANO
+ref table DIM_CALENDARIO
+ref table DIM_CATEGORIA_ATRASO
+ref table DIM_COMPANHIA
+ref table DIM_FAIXA_HORARIA
+ref table DIM_MOTIVO_INVALIDEZ_CHEGADA
+ref table DIM_SEGMENTO
+ref table DIM_SITUACAO_VOO
+ref table FATO_CELULA_P11
+ref table FATO_CURVA_LORENZ
+ref table FATO_VOO
+ref table MET_AEROPORTO
+ref table MET_ANO
+ref table MET_H2_VARIANCIA
+ref table MET_OPERADORA
+ref table MET_SEGMENTO
+ref table MET_UNIVERSO
+ref table _HOMOLOGACAO_PYTHON
+
+ref cultureInfo pt-BR
+

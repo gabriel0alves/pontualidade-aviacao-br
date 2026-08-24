@@ -1,0 +1,13 @@
+// Homologação 05 — Taxa de cancelamento HEADLINE (D3: passageiros, segmento validado).
+//
+// Decisão A (Rodada 7A, 2026-08-21): o denominador e o numerador desta medida
+// excluem registros sem data_partida_prevista, dentro da própria medida DAX
+// (nunca por filtro de página) -- equivalente ao dropna(subset=["ano"]) de
+// 06_bloco_b_temporal.py, comprovado empiricamente linha a linha contra
+// data_partida_prevista.isna() em FATO_VOO.parquet (0 divergências).
+// Referência Python (KPI6, headline): 2,3871% (121.900 / 5.106.720).
+// 92.302 voos programados de passageiros ficam fora do denominador por não
+// terem data_partida_prevista -- ver [Voos Programados sem Período --
+// Headline] e [Cobertura Temporal KPI6 -- Headline %] (consulta 17a).
+EVALUATE
+ROW("Taxa de Cancelamento -- Headline", [Taxa de Cancelamento -- Headline])

@@ -1,0 +1,38 @@
+/// Dimensao de companhia aerea (operadora_analitica). Grupo economico e caracteristica operacional sao atributos de sensibilidade/controle, nao recorte principal.
+table DIM_COMPANHIA
+	lineageTag: 1c8f780f-52cb-4b93-b22c-ae11d0617133
+
+	/// Chave da dimensao. 6 valores: as 5 identidades de regras.DIM_COMPANHIA + o residual 'Outros'.
+	column operadora_analitica
+		dataType: string
+		lineageTag: 5e57e5b6-7af2-43c7-b5fe-e5dfbeaf2342
+		summarizeBy: none
+		sourceColumn: operadora_analitica
+
+	/// Quem controla -- analise de SENSIBILIDADE (D2). operadora_analitica e o recorte PRINCIPAL.
+	column grupo_economico
+		dataType: string
+		lineageTag: 15e04159-7271-4a59-8609-606042567fa3
+		summarizeBy: none
+		sourceColumn: grupo_economico
+
+	/// Variavel de CONTROLE (frota), nunca criterio de agrupamento (D2).
+	column caracteristica_operacional
+		dataType: string
+		lineageTag: 752bf821-7665-452d-8e2e-953c1039b416
+		summarizeBy: none
+		sourceColumn: caracteristica_operacional
+
+	partition DIM_COMPANHIA = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_COMPANHIA.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"operadora_analitica", type text}, {"grupo_economico", type text}, {"caracteristica_operacional", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

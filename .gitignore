@@ -65,9 +65,23 @@ htmlcov/
 # ---------------------------------------------------------------
 # Power BI
 # ---------------------------------------------------------------
-# .pbix e binario e pesado; versionar apenas o arquivo final publicado.
+# Projeto versionado como PBIP (TMDL + PBIR, texto) a partir da Rodada 7A --
+# ver powerbi/PontualidadeAviacaoBR.pbip. O .pbix binario NAO e mais a fonte
+# de verdade; nao versionar (nem o .pbix solto deixado pela criacao inicial
+# do projeto, nem backups).
+*.pbix
 *.pbix.bak
 TempSaves/
+
+# Arquivos locais/maquina-especificos do projeto PBIP (Rodada 7A) -- cache
+# binario do modelo (.abf, pode conter DADOS reais importados) e
+# configuracoes de sessao do Desktop (nao sao parte do modelo/relatorio
+# versionavel, mudam a cada maquina).
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+**/.pbi/editorSettings.json
+**/DAXQueries/.pbi/daxQueries.json
+**/unappliedChanges.json
 
 # ---------------------------------------------------------------
 # Saidas geradas

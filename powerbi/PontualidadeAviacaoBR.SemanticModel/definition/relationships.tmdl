@@ -1,0 +1,60 @@
+relationship 3aa1fd61-b38d-42d8-82c7-10e66915e895
+	fromColumn: DIM_CALENDARIO.ano
+	toColumn: DIM_ANO.ano
+
+relationship 29ab18ac-c456-4600-9106-eb3afb42a7d0
+	fromColumn: FATO_VOO.data_partida_prevista
+	toColumn: DIM_CALENDARIO.data
+
+relationship 9041fb42-da2c-4236-8183-02d54b5d1392
+	fromColumn: FATO_VOO.icao_origem
+	toColumn: DIM_AEROPORTO.icao
+
+relationship 39f280ab-c991-4e85-8f9b-9a438238828c
+	fromColumn: FATO_VOO.operadora_analitica
+	toColumn: DIM_COMPANHIA.operadora_analitica
+
+relationship b3aba13e-0c85-4341-aff0-91da34eeb9f4
+	fromColumn: FATO_VOO.segmento_operacional
+	toColumn: DIM_SEGMENTO.segmento_operacional
+
+relationship 0b3ccf2b-a191-4b3c-8486-fdcde322c8ab
+	fromColumn: FATO_VOO.faixa_3h
+	toColumn: DIM_FAIXA_HORARIA.faixa_3h
+
+relationship 54ccc020-186c-4938-a99e-dbd15badd731
+	fromColumn: FATO_VOO.situacao_voo
+	toColumn: DIM_SITUACAO_VOO.situacao_voo
+
+relationship ed183747-5f72-49ba-be74-8f22562be956
+	fromColumn: FATO_VOO.categoria_atraso
+	toColumn: DIM_CATEGORIA_ATRASO.categoria_atraso
+
+relationship de16e18f-87b3-4c41-8e7f-a8b7dfbf15fd
+	fromColumn: FATO_VOO.motivo_principal_invalidez_chegada
+	toColumn: DIM_MOTIVO_INVALIDEZ_CHEGADA.motivo_principal_invalidez_chegada
+
+relationship 1a30499e-9d4f-42f0-a863-7a3f19c009d5
+	fromColumn: FATO_CELULA_P11.icao_origem
+	toColumn: DIM_AEROPORTO.icao
+
+relationship b419893a-dc4b-449f-8c63-23c8c3b72661
+	fromColumn: FATO_CELULA_P11.faixa_3h
+	toColumn: DIM_FAIXA_HORARIA.faixa_3h
+
+relationship 0e4cf86a-e7d0-4c47-8ef5-dc07db40f085
+	fromColumn: MET_ANO.ano
+	toColumn: DIM_ANO.ano
+
+relationship b98679e0-bd8f-4c10-bafe-9a969e51a45d
+	fromColumn: MET_OPERADORA.operadora_analitica
+	toColumn: DIM_COMPANHIA.operadora_analitica
+
+relationship aaacded8-ad15-4274-8637-319da796c970
+	fromColumn: MET_AEROPORTO.icao
+	toColumn: DIM_AEROPORTO.icao
+
+relationship e68c67d0-db7d-4bb1-908e-7a7fd197d223
+	fromColumn: MET_SEGMENTO.segmento_operacional
+	toColumn: DIM_SEGMENTO.segmento_operacional
+

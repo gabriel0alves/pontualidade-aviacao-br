@@ -1,0 +1,116 @@
+/// Referencia pre-agregada da decomposicao de variancia de H2 (aeroporto vs operadora). Tabela DESCONECTADA -- 3 escopos fixos.
+table MET_H2_VARIANCIA
+	lineageTag: c8cb1ae3-1286-44d3-b66a-ac70cce62a90
+
+	/// H2: aeroporto vs operadora. >1 compatível com H2, <1 refuta. Sem reconciliação DAX dinâmica -- lógica só em decompor_variancia() (§11.3).
+	measure 'Razão de Variância H2 -- Todas as Operadoras' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_H2_VARIANCIA,
+			        MET_H2_VARIANCIA[escopo] = "todas_operadoras"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_H2_VARIANCIA[razao]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: ada8130e-e838-4a57-84d2-2be6992cad8c
+
+	/// H2: aeroporto vs operadora. >1 compatível com H2, <1 refuta. Sem reconciliação DAX dinâmica -- lógica só em decompor_variancia() (§11.3).
+	measure 'Razão de Variância H2 -- Azul/LATAM/GOL (Operadora)' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_H2_VARIANCIA,
+			        MET_H2_VARIANCIA[escopo] = "azul_latam_gol_operadora"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_H2_VARIANCIA[razao]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 1e381e7e-c30d-4f0d-b5b6-dc716aeeb063
+
+	/// H2: aeroporto vs operadora. >1 compatível com H2, <1 refuta. Sem reconciliação DAX dinâmica -- lógica só em decompor_variancia() (§11.3).
+	measure 'Razão de Variância H2 -- Azul/LATAM/GOL (Grupo Econômico)' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_H2_VARIANCIA,
+			        MET_H2_VARIANCIA[escopo] = "azul_latam_gol_grupo"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_H2_VARIANCIA[razao]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 78cd5066-f402-49fc-993e-937cd09b0fb4
+
+	/// todas_operadoras | azul_latam_gol_operadora | azul_latam_gol_grupo. Tabela DESCONECTADA.
+	column escopo
+		dataType: string
+		lineageTag: cabcbe4e-866b-4d7f-a675-cbd7d752a817
+		summarizeBy: none
+		sourceColumn: escopo
+
+	column var_entre_operadoras_pp2
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: 78578a18-70b8-4f44-98ae-07129b4cc5c0
+		summarizeBy: none
+		sourceColumn: var_entre_operadoras_pp2
+
+	column var_entre_aeroportos_pp2
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: 33fa9477-3875-4d93-b37e-3d1aef245361
+		summarizeBy: none
+		sourceColumn: var_entre_aeroportos_pp2
+
+	/// var_entre_aeroportos_pp2 / var_entre_operadoras_pp2. >1 compativel com H2, <1 refuta H2.
+	column razao
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: a824a33a-87cc-4f04-9533-6a1334ac0c8a
+		summarizeBy: none
+		sourceColumn: razao
+
+	column celulas_comparaveis
+		dataType: int64
+		formatString: #,0
+		lineageTag: 83dcbad0-c367-4537-b9b9-8aa35eb9e1b3
+		summarizeBy: none
+		sourceColumn: celulas_comparaveis
+
+	column aeroportos_comparaveis
+		dataType: int64
+		formatString: #,0
+		lineageTag: de8c5a96-8418-460b-af32-a757ae99f839
+		summarizeBy: none
+		sourceColumn: aeroportos_comparaveis
+
+	column grupos_comparaveis
+		dataType: int64
+		formatString: #,0
+		lineageTag: 6419e936-2bd7-4956-9fef-896d52172f19
+		summarizeBy: none
+		sourceColumn: grupos_comparaveis
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 53919008-a14d-4c1d-b860-c8ccfc0a35db
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	partition MET_H2_VARIANCIA = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_H2_VARIANCIA.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"escopo", type text}, {"var_entre_operadoras_pp2", type number}, {"var_entre_aeroportos_pp2", type number}, {"razao", type number}, {"celulas_comparaveis", Int64.Type}, {"aeroportos_comparaveis", Int64.Type}, {"grupos_comparaveis", Int64.Type}, {"data_calculo", type datetime}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

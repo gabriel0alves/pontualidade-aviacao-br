@@ -1,0 +1,77 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "6a28121b81ed4856e50a",
+  "position": {
+    "x": 1600,
+    "y": 850,
+    "z": 5000,
+    "height": 230,
+    "width": 320,
+    "tabOrder": 5000
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "DIM_SEGMENTO"
+                    }
+                  },
+                  "Property": "segmento_operacional"
+                }
+              },
+              "queryRef": "DIM_SEGMENTO.segmento_operacional",
+              "nativeQueryRef": "segmento_operacional",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "data": [
+        {
+          "properties": {
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Dropdown'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {}
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "3308c565f310747cb18e",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "DIM_SEGMENTO"
+              }
+            },
+            "Property": "segmento_operacional"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

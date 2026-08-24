@@ -1,0 +1,130 @@
+/// Referencia pre-agregada de ICA5/Gini/top-shares por segmento operacional (todos os 5, sem corte). FK para DIM_SEGMENTO.
+table MET_SEGMENTO
+	lineageTag: a022c52d-8774-4ec4-824d-c1d461c1afe7
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- Segmento' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_SEGMENTO,
+			        MET_SEGMENTO[metrica] = "ica5_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_SEGMENTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 6dd8fd98-6db6-48e8-9198-478e9082cb23
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- Segmento' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_SEGMENTO,
+			        MET_SEGMENTO[metrica] = "gini"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_SEGMENTO[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 0cec1dc6-bd68-42a1-b4a9-671018d4e7ba
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- Segmento' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_SEGMENTO,
+			        MET_SEGMENTO[metrica] = "top1_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_SEGMENTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 9cb9a989-99df-4779-8b61-65b86f96f381
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- Segmento' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_SEGMENTO,
+			        MET_SEGMENTO[metrica] = "top10_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_SEGMENTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 7427c7c8-f954-46c8-a110-45fab2b2af0c
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- Segmento' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_SEGMENTO,
+			        MET_SEGMENTO[metrica] = "top20_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_SEGMENTO[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 42f62dc0-c894-4683-aaf4-4d51c94e6312
+
+	/// FK para DIM_SEGMENTO[segmento_operacional]. TODOS os 5 segmentos, sem corte de volume (D3).
+	column segmento_operacional
+		dataType: string
+		lineageTag: 1d0e0d71-d268-49bf-87ce-beb54632f2e6
+		summarizeBy: none
+		sourceColumn: segmento_operacional
+
+	/// Dominio fechado: ica5_pct, gini, top1_pct, top10_pct, top20_pct.
+	column metrica
+		dataType: string
+		lineageTag: eaeb09e1-0c43-4177-adb9-a27fc4ad02bf
+		summarizeBy: none
+		sourceColumn: metrica
+
+	/// Escala mista -- ver MET_UNIVERSO.
+	column valor
+		dataType: double
+		formatString: #,0.00000
+		lineageTag: 127f41ab-987a-4d92-9169-52f4b9d863c0
+		summarizeBy: none
+		sourceColumn: valor
+
+	column n_voos_base
+		dataType: int64
+		formatString: #,0
+		lineageTag: fc87eae2-747c-411d-8684-fa31cf2e6234
+		summarizeBy: none
+		sourceColumn: n_voos_base
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: eff16c2f-dd3a-447f-8cfb-a4e2242539f5
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	column chave_grao
+		dataType: string
+		isHidden
+		lineageTag: 471edc56-d761-406b-a35d-04a6cbed8e98
+		summarizeBy: none
+		sourceColumn: chave_grao
+
+	partition MET_SEGMENTO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_SEGMENTO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"segmento_operacional", type text}, {"metrica", type text}, {"valor", type number}, {"n_voos_base", Int64.Type}, {"data_calculo", type datetime}, {"chave_grao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

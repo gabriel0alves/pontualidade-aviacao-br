@@ -1,0 +1,130 @@
+/// Referencia pre-agregada de ICA5/Gini/top-shares por operadora. FK para DIM_COMPANHIA.
+table MET_OPERADORA
+	lineageTag: 54625931-a899-4641-81b9-e7c267eb894e
+
+	/// ICA5 -- 5% de voos com maior impacto / impacto total (indicador AUTORAL, não é métrica ANAC nem padrão de mercado). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'ICA5 % -- Operadora' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_OPERADORA,
+			        MET_OPERADORA[metrica] = "ica5_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_OPERADORA[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 488b26bc-17e5-470a-8f10-a91e9eb225e7
+
+	/// Coeficiente de Gini do impacto (0=uniforme, 1=concentração total). Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Gini -- Operadora' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_OPERADORA,
+			        MET_OPERADORA[metrica] = "gini"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_OPERADORA[valor]))
+		formatString: 0.0000
+		displayFolder: Concentração
+		lineageTag: 982ad026-fe80-4d38-9f70-2605b17ec43c
+
+	/// Share do impacto concentrado no 1% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 1% Share -- Operadora' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_OPERADORA,
+			        MET_OPERADORA[metrica] = "top1_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_OPERADORA[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 33f4693b-d97d-4bb4-bfcd-5efb52bfc7d7
+
+	/// Share do impacto concentrado nos 10% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 10% Share -- Operadora' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_OPERADORA,
+			        MET_OPERADORA[metrica] = "top10_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_OPERADORA[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 6005b08e-c7ca-4a31-9716-019a7c240fae
+
+	/// Share do impacto concentrado nos 20% de voos de maior impacto. Padrão COUNTROWS-guardado (§11.2) -- nunca SELECTEDVALUE(valor) sozinho.
+	measure 'Top 20% Share -- Operadora' =
+			VAR _linhas =
+			    CALCULATETABLE(
+			        MET_OPERADORA,
+			        MET_OPERADORA[metrica] = "top20_pct"
+			    )
+			VAR _n = COUNTROWS(_linhas)
+			RETURN
+			    IF(_n = 1, MAXX(_linhas, MET_OPERADORA[valor]))
+		formatString: 0.00\%
+		displayFolder: Concentração
+		lineageTag: 4a929a22-a3de-455e-9e0f-32c418f372dc
+
+	/// FK para DIM_COMPANHIA[operadora_analitica]. So operadoras com n >= VOLUME_MINIMO_COMPANHIA.
+	column operadora_analitica
+		dataType: string
+		lineageTag: 12619d02-f8fb-4854-88d5-ccf4bf5738a7
+		summarizeBy: none
+		sourceColumn: operadora_analitica
+
+	/// Dominio fechado: ica5_pct, gini, top1_pct, top10_pct, top20_pct.
+	column metrica
+		dataType: string
+		lineageTag: 87f4c713-2248-48d8-8092-d5fbe9b069cb
+		summarizeBy: none
+		sourceColumn: metrica
+
+	/// Escala mista -- ver MET_UNIVERSO.
+	column valor
+		dataType: double
+		formatString: #,0.00000
+		lineageTag: c2b56225-a17c-4bd9-b64b-f4b6d71ca201
+		summarizeBy: none
+		sourceColumn: valor
+
+	column n_voos_base
+		dataType: int64
+		formatString: #,0
+		lineageTag: 386bd175-3d9e-490b-ac44-84033e6b3845
+		summarizeBy: none
+		sourceColumn: n_voos_base
+
+	column data_calculo
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: 9d9a958f-7e81-4bb9-932f-5acaef852abe
+		summarizeBy: none
+		sourceColumn: data_calculo
+
+	column chave_grao
+		dataType: string
+		isHidden
+		lineageTag: 30342bb9-c9c5-4483-93a6-d87e14d57069
+		summarizeBy: none
+		sourceColumn: chave_grao
+
+	partition MET_OPERADORA = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\MET_OPERADORA.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"operadora_analitica", type text}, {"metrica", type text}, {"valor", type number}, {"n_voos_base", Int64.Type}, {"data_calculo", type datetime}, {"chave_grao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

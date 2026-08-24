@@ -108,6 +108,44 @@ def test_dim_calendario_data_unica_e_sem_lacunas(tabelas):
     assert (datas.to_numpy() == esperado.to_numpy()).all()
 
 
+def test_dim_calendario_mes_inicio_e_o_primeiro_dia_do_mes_de_cada_linha(tabelas):
+    """mes_inicio deve ser dateTime, valer o dia 1 do mes de `data`, e ter
+    a mesma cardinalidade de ano_mes (1 valor distinto por mes -- nao
+    muda a granularidade da tabela, so tipa 'primeiro dia do mes' como
+    data em vez de string)."""
+    cal = tabelas["DIM_CALENDARIO"]
+    assert "mes_inicio" in cal.columns
+    assert pd.api.types.is_datetime64_any_dtype(cal["mes_inicio"])
+
+    mes_inicio = pd.to_datetime(cal["mes_inicio"])
+    assert (mes_inicio.dt.day == 1).all(), "mes_inicio deve ser sempre dia 1"
+    assert (mes_inicio.dt.year == cal["ano"]).all()
+    assert (mes_inicio.dt.month == cal["mes"]).all()
+
+    assert cal["mes_inicio"].nunique() == cal["ano_mes"].nunique(), (
+        "mes_inicio deve ter exatamente 1 valor distinto por ano_mes "
+        "(mesma granularidade mensal)"
+    )
+    # correspondencia 1:1 entre ano_mes (string) e mes_inicio (data)
+    assert (cal.groupby("ano_mes")["mes_inicio"].nunique() == 1).all()
+
+
+def test_dim_calendario_mes_inicio_ordena_cronologicamente_como_ano_mes(tabelas):
+    """Ordenar por mes_inicio deve produzir a mesma sequencia de meses que
+    ordenar por ano_mes (string 'YYYY-MM', ja comprovadamente cronologica)
+    -- confirma que a nova coluna e' uma substituta valida no eixo."""
+    cal = tabelas["DIM_CALENDARIO"]
+    por_ano_mes = (
+        cal.drop_duplicates("ano_mes").sort_values("ano_mes")["ano_mes"].tolist()
+    )
+    por_mes_inicio = (
+        cal.drop_duplicates("mes_inicio")
+        .sort_values("mes_inicio")["ano_mes"]
+        .tolist()
+    )
+    assert por_ano_mes == por_mes_inicio
+
+
 def test_dim_aeroporto_chave_unica(tabelas):
     assert tabelas["DIM_AEROPORTO"]["icao"].is_unique
 

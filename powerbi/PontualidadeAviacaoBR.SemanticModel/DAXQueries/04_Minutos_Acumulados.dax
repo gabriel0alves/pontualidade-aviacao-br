@@ -1,0 +1,4 @@
+// Homologação 04 — Minutos acumulados de atraso (KPI5, Métrica B: só impacto positivo).
+// Referência Python: 42.584.980.
+EVALUATE
+ROW("Minutos Acumulados de Atraso", [Minutos Acumulados de Atraso])

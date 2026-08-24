@@ -1,0 +1,94 @@
+/// Referência estática de homologação (Rodada 7A) -- valores computados direto do Python (voos.parquet / eda_*.md) para as consultas de homologação, incluindo os indicadores de cobertura temporal do KPI6 (decisão A, Rodada 7A). NÃO é regra de negócio: é dado de teste/QA versionado junto do modelo, análogo a um valor esperado de teste automatizado. A quantidade de linhas não é um contrato fixo -- conferir a contagem real na partição M abaixo. Comparar contra os cartões DAX equivalentes na página 00 — Homologação.
+table _HOMOLOGACAO_PYTHON
+	lineageTag: 933f77a1-6498-44cd-bc5f-c1c5e1b7490c
+
+	column codigo_consulta
+		dataType: string
+		lineageTag: 13082ae0-4578-453a-a760-f9fabe76b55d
+		summarizeBy: none
+		sourceColumn: codigo_consulta
+
+	column metrica
+		dataType: string
+		lineageTag: 511027f7-84c1-4096-a8f0-f9c67f9386f9
+		summarizeBy: none
+		sourceColumn: metrica
+
+	column recorte
+		dataType: string
+		lineageTag: b3d53a91-1655-41fd-a456-d73f6c398b0d
+		summarizeBy: none
+		sourceColumn: recorte
+
+	/// Escala mista conforme a coluna unidade -- contagem/minutos em unidade natural, percentual_pp já em escala 0-100, coeficiente (gini) em 0-1.
+	column valor_python
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: 2955a1fb-7537-45d4-87bf-7b12cc0c86b6
+		summarizeBy: none
+		sourceColumn: valor_python
+
+	column unidade
+		dataType: string
+		lineageTag: 3fa1763c-3849-4d04-a715-72803cc33642
+		summarizeBy: none
+		sourceColumn: unidade
+
+	/// Tolerância de arredondamento (Seção 10 da Rodada 7A) -- contagens e minutos inteiros exigem diferença ZERO.
+	column tolerancia
+		dataType: double
+		formatString: #,0.0000
+		lineageTag: 1d9cc23e-c17c-4aee-af51-662582ccf75a
+		summarizeBy: none
+		sourceColumn: tolerancia
+
+	column observacao
+		dataType: string
+		lineageTag: a502be37-0d17-4983-b109-0bcd8bdd6a0e
+		summarizeBy: none
+		sourceColumn: observacao
+
+	partition _HOMOLOGACAO_PYTHON = m
+		mode: import
+		source =
+				let
+				    Origem = Table.FromRecords(
+				        {
+				        [codigo_consulta = "01", metrica = "Contagem de Voos", recorte = "universo", valor_python = 5452295.0, unidade = "contagem", tolerancia = 0.0, observacao = "FATO_VOO completo, sem filtro."],
+				        [codigo_consulta = "02", metrica = "Voos Válidos", recorte = "universo", valor_python = 5193012.0, unidade = "contagem", tolerancia = 0.0, observacao = "atraso_valido = R∩P∩Lp."],
+				        [codigo_consulta = "03", metrica = "OTP15 %", recorte = "universo", valor_python = 85.9344, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Recomputado direto de voos.parquet nesta rodada."],
+				        [codigo_consulta = "04", metrica = "Minutos Acumulados de Atraso", recorte = "universo", valor_python = 42584980.0, unidade = "minutos", tolerancia = 0.0, observacao = "Métrica B (só impacto positivo), D.2."],
+				        [codigo_consulta = "05", metrica = "Taxa de Cancelamento -- Headline", recorte = "passageiros (D3)", valor_python = 2.3871, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Decisão A (Rodada 7A): denominador e numerador restritos a registros com data_partida_prevista preenchida, equivalente a dropna(subset=[ano]) de 06_bloco_b_temporal.py. Aplicado dentro da medida DAX (não é filtro de página). 92.302 voos programados de passageiros ficam fora por não terem período -- ver Cobertura Temporal KPI6 -- Headline % (consulta 17a)."],
+				        [codigo_consulta = "06", metrica = "Taxa de Cancelamento -- Todos os Segmentos", recorte = "todos os segmentos", valor_python = 2.712, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Decisão A (Rodada 7A): mesma regra temporal da consulta 05, aplicada à visão de sensibilidade todos-os-segmentos. 112.623 voos programados ficam fora por não terem período -- ver Cobertura Temporal KPI6 -- Todos os Segmentos % (consulta 17b)."],
+				        [codigo_consulta = "07", metrica = "Mediana Recuperação em Voo", recorte = "KPI7", valor_python = -3.0, unidade = "minutos", tolerancia = 0.0, observacao = "Negativo = recuperação parcial em voo, na mediana."],
+				        [codigo_consulta = "08", metrica = "ICA5 %", recorte = "universo", valor_python = 56.2081, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Indicador autoral -- eda_bloco_d.md D.4."],
+				        [codigo_consulta = "09", metrica = "Gini", recorte = "universo", valor_python = 0.865688, unidade = "coeficiente", tolerancia = 0.0001, observacao = "eda_bloco_d.md D.4."],
+				        [codigo_consulta = "10a", metrica = "Voos Válidos", recorte = "ano = 2024", valor_python = 774451.0, unidade = "contagem", tolerancia = 0.0, observacao = "Testa DIM_ANO -> DIM_CALENDARIO -> FATO_VOO."],
+				        [codigo_consulta = "10b", metrica = "OTP15 %", recorte = "ano = 2024", valor_python = 84.0566, unidade = "percentual_pp", tolerancia = 0.01, observacao = ""],
+				        [codigo_consulta = "11a", metrica = "Voos Válidos", recorte = "YTD 2026 (jan-jun)", valor_python = 389066.0, unidade = "contagem", tolerancia = 0.0, observacao = "2026 é ano parcial -- YTD homólogo obrigatório."],
+				        [codigo_consulta = "11b", metrica = "OTP15 %", recorte = "YTD 2026 (jan-jun)", valor_python = 84.527, unidade = "percentual_pp", tolerancia = 0.01, observacao = ""],
+				        [codigo_consulta = "12a", metrica = "Voos Válidos", recorte = "LATAM", valor_python = 1540541.0, unidade = "contagem", tolerancia = 0.0, observacao = ""],
+				        [codigo_consulta = "12b", metrica = "OTP15 %", recorte = "LATAM", valor_python = 86.8794, unidade = "percentual_pp", tolerancia = 0.01, observacao = ""],
+				        [codigo_consulta = "13a", metrica = "Voos Válidos", recorte = "SBGR", valor_python = 654040.0, unidade = "contagem", tolerancia = 0.0, observacao = ""],
+				        [codigo_consulta = "13b", metrica = "Minutos Acumulados de Atraso", recorte = "SBGR", valor_python = 6636909.0, unidade = "minutos", tolerancia = 0.0, observacao = "eda_bloco_e.md E.3."],
+				        [codigo_consulta = "14", metrica = "Minutos Acumulados de Atraso", recorte = "SBGR x 21h-24h", valor_python = 1714193.0, unidade = "minutos", tolerancia = 0.0, observacao = "eda_bloco_f.md F.6."],
+				        [codigo_consulta = "15", metrica = "Conjunto 146", recorte = "KPI7", valor_python = 146.0, unidade = "contagem", tolerancia = 0.0, observacao = "status_projeto.md secao 0.1."],
+				        [codigo_consulta = "16a", metrica = "Curva de Lorenz -- percentil_voos=0", recorte = "universo", valor_python = 0.0, unidade = "percentual", tolerancia = 0.0, observacao = "Endpoint (0,0) por construção."],
+				        [codigo_consulta = "16b", metrica = "Curva de Lorenz -- percentil_voos=100", recorte = "universo", valor_python = 100.0, unidade = "percentual", tolerancia = 0.0, observacao = "Endpoint (100,100) por construção."],
+				        [codigo_consulta = "17a", metrica = "Cobertura Temporal KPI6 -- Headline %", recorte = "passageiros (D3)", valor_python = 98.2246, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Decisão A (Rodada 7A): programados com data_partida_prevista / programados antes da exclusão temporal = 5.106.720 / 5.199.022. Adicionada junto com a correção da consulta 05."],
+				        [codigo_consulta = "17b", metrica = "Cobertura Temporal KPI6 -- Todos os Segmentos %", recorte = "todos os segmentos", valor_python = 97.9339, unidade = "percentual_pp", tolerancia = 0.01, observacao = "Decisão A (Rodada 7A): programados com data_partida_prevista / programados antes da exclusão temporal = 5.338.365 / 5.450.988. Adicionada junto com a correção da consulta 06."]
+				        },
+				        type table[
+				            codigo_consulta = text, metrica = text, recorte = text,
+				            valor_python = number, unidade = text, tolerancia = number,
+				            observacao = text
+				        ],
+				        MissingField.Error
+				    )
+				in
+				    Origem
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

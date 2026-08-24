@@ -1,0 +1,9 @@
+// Homologação 14 — SBGR × faixa 21h-24h (dupla FK: DIM_AEROPORTO + DIM_FAIXA_HORARIA).
+// Referência Python: Minutos Acumulados (histórico completo) = 1.714.193
+// (eda_bloco_f.md F.6).
+EVALUATE
+CALCULATETABLE(
+    ROW("Minutos Acumulados de Atraso", [Minutos Acumulados de Atraso]),
+    DIM_AEROPORTO[icao] = "SBGR",
+    DIM_FAIXA_HORARIA[faixa_3h] = "21h-24h"
+)

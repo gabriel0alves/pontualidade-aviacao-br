@@ -1,0 +1,37 @@
+/// Dimensao de situacao do voo (REALIZADO/CANCELADO/NAO INFORMADO).
+table DIM_SITUACAO_VOO
+	lineageTag: f356664a-12a0-4b67-aba7-b7e2a8eb3552
+
+	/// Chave da dimensao.
+	column situacao_voo
+		dataType: string
+		lineageTag: 21fb9e93-68b3-441f-b1b6-61b628685d91
+		summarizeBy: none
+		sourceColumn: situacao_voo
+
+	column descricao
+		dataType: string
+		lineageTag: 898606f0-0350-4e51-9ffa-22d0d976b9cb
+		summarizeBy: none
+		sourceColumn: descricao
+
+	/// True para REALIZADO/CANCELADO -- 'NAO INFORMADO' fica de fora.
+	column entra_denominador_kpi6
+		dataType: boolean
+		lineageTag: e7e8d228-84d3-48e7-ab34-9e91e354d0b3
+		summarizeBy: none
+		sourceColumn: entra_denominador_kpi6
+
+	partition DIM_SITUACAO_VOO = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_SITUACAO_VOO.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"situacao_voo", type text}, {"descricao", type text}, {"entra_denominador_kpi6", type logical}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

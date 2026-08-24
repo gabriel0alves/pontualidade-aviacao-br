@@ -1,0 +1,4 @@
+// Homologação 15 — Conjunto 146 do KPI7 (atraso_valido \ atraso_chegada_valido).
+// Referência Python: 146 (status_projeto.md secao 0.1; regras.py D1).
+EVALUATE
+ROW("Conjunto 146", [Conjunto 146 (Atraso Válido menos Atraso Chegada Válido)])

@@ -1,0 +1,40 @@
+/// Dimensao do motivo principal de invalidez da chegada (R10, ordem de precedencia).
+table DIM_MOTIVO_INVALIDEZ_CHEGADA
+	lineageTag: c1858126-5019-4e0b-a38f-03a4e0034b17
+
+	/// Chave da dimensao. NULL no fato = chegada valida (nao e uma linha desta dimensao).
+	column motivo_principal_invalidez_chegada
+		dataType: string
+		lineageTag: 07f1bdf0-d3ab-4953-b3ce-aeca80024089
+		summarizeBy: none
+		sourceColumn: motivo_principal_invalidez_chegada
+		sortByColumn: ordem_precedencia
+
+	/// Ordem de precedencia de MOTIVOS_INVALIDEZ_CHEGADA (regras.py) -- usada só para ordenar.
+	column ordem_precedencia
+		dataType: int64
+		isHidden
+		formatString: #,0
+		lineageTag: f9ab513a-15ba-41d3-b1eb-e66b9da5098b
+		summarizeBy: none
+		sourceColumn: ordem_precedencia
+
+	column descricao
+		dataType: string
+		lineageTag: bb70c33b-6c51-4999-9e89-919295605fc8
+		summarizeBy: none
+		sourceColumn: descricao
+
+	partition DIM_MOTIVO_INVALIDEZ_CHEGADA = m
+		mode: import
+		source =
+				let
+				    Origem = Parquet.Document(File.Contents(pPowerBIDataRoot & "\DIM_MOTIVO_INVALIDEZ_CHEGADA.parquet")),
+				    #"Tipos Alterados" = Table.TransformColumnTypes(Origem, {{"motivo_principal_invalidez_chegada", type text}, {"ordem_precedencia", Int64.Type}, {"descricao", type text}})
+				in
+				    #"Tipos Alterados"
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = Navigation
+

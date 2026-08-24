@@ -1,0 +1,12 @@
+// Homologação 10 — Ano fechado de 2024, filtrado via DIM_ANO (testa o
+// caminho DIM_ANO -> DIM_CALENDARIO -> FATO_VOO, o próprio motivo de
+// DIM_ANO ter sido criada nesta especificação -- ver §5).
+// Referência Python: Voos Válidos = 774.451; OTP15 % = 84,0566%.
+EVALUATE
+CALCULATETABLE(
+    ROW(
+        "Voos Válidos", [Voos Válidos],
+        "OTP15 %", [OTP15 %]
+    ),
+    DIM_ANO[ano] = 2024
+)

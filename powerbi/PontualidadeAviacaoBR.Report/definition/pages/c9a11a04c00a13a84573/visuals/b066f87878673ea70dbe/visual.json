@@ -1,0 +1,242 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "b066f87878673ea70dbe",
+  "position": {
+    "x": 0,
+    "y": 160.78431372549019,
+    "z": 9000,
+    "height": 919.60784313725492,
+    "width": 1580.392156862745,
+    "tabOrder": 9000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "codigo_consulta"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.codigo_consulta",
+              "nativeQueryRef": "codigo_consulta"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "metrica"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.metrica",
+              "nativeQueryRef": "metrica"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "recorte"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.recorte",
+              "nativeQueryRef": "recorte"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "valor_python"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.valor_python",
+              "nativeQueryRef": "valor_python"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "unidade"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.unidade",
+              "nativeQueryRef": "unidade"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "tolerancia"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.tolerancia",
+              "nativeQueryRef": "tolerancia"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_HOMOLOGACAO_PYTHON"
+                    }
+                  },
+                  "Property": "observacao"
+                }
+              },
+              "queryRef": "_HOMOLOGACAO_PYTHON.observacao",
+              "nativeQueryRef": "observacao"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "_HOMOLOGACAO_PYTHON"
+                  }
+                },
+                "Property": "codigo_consulta"
+              }
+            },
+            "direction": "Ascending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "e0b5970528d0694b5426",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "codigo_consulta"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "143cfee0f45e0affeb99",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "metrica"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "367dd38ce0a4b50408ac",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "recorte"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "c435072a3d3a44891719",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "valor_python"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "0ccbb589907b9d0e4347",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "unidade"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "efb2d9ea4c8967917bc0",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "tolerancia"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "088f297fd39eac5e5cc0",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_HOMOLOGACAO_PYTHON"
+              }
+            },
+            "Property": "observacao"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

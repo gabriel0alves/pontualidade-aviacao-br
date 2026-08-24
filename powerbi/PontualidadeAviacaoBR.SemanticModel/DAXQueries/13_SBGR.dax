@@ -1,0 +1,11 @@
+// Homologação 13 — Um aeroporto (SBGR), via DIM_AEROPORTO[icao].
+// Referência Python: Voos Válidos = 654.040; Minutos Acumulados = 6.636.909
+// (eda_bloco_e.md E.3).
+EVALUATE
+CALCULATETABLE(
+    ROW(
+        "Voos Válidos", [Voos Válidos],
+        "Minutos Acumulados de Atraso", [Minutos Acumulados de Atraso]
+    ),
+    DIM_AEROPORTO[icao] = "SBGR"
+)

@@ -1,0 +1,10 @@
+// Homologação 12 — Uma companhia (LATAM), via DIM_COMPANHIA[operadora_analitica].
+// Referência Python: Voos Válidos = 1.540.541; OTP15 % = 86,8794%.
+EVALUATE
+CALCULATETABLE(
+    ROW(
+        "Voos Válidos", [Voos Válidos],
+        "OTP15 %", [OTP15 %]
+    ),
+    DIM_COMPANHIA[operadora_analitica] = "LATAM"
+)

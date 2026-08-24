@@ -1,0 +1,4 @@
+// Homologação 01 — Contagem de voos (FATO_VOO, grão completo, sem filtro).
+// Referência Python: 5.452.295 (data/processed/voos.parquet, len(df)).
+EVALUATE
+ROW("Contagem de Voos (FATO_VOO)", COUNTROWS(FATO_VOO))

@@ -1,0 +1,4 @@
+// Homologação 08 — ICA5 (indicador AUTORAL, escopo universo).
+// Referência Python: 56,2081% (eda_bloco_d.md D.4: "56,21%").
+EVALUATE
+ROW("ICA5 % -- Universo", [ICA5 % -- Universo])
