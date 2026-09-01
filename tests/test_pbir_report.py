@@ -334,30 +334,104 @@ def test_medidas_em_cards_e_tabelas_tem_formatString() -> None:
     assert not problemas, "\n".join(problemas)
 
 
-@pytest.mark.xfail(
-    reason=(
-        "O mecanismo PBIR para titulo customizado (visualContainerObjects.title, "
-        "propriedades 'show'/'text') foi comprovado e aplicado com sucesso no "
-        "cartao 'Contagem de Voos' (ID 4abe69b0e37d178de552, Lote 1) -- ver "
-        "test_cartao_contagem_de_voos_titulo_e_exatamente_contagem_de_voos, "
-        "validado no Power BI Desktop. Nao e mais um problema de schema "
-        "desconhecido: os demais cardVisual do relatorio ainda nao receberam "
-        "esse tratamento porque o escopo do Lote 1 foi limitado a esse unico "
-        "visual. Este teste xfail apenas rastreia esse trabalho pendente para "
-        "lotes futuros."
-    ),
-    strict=True,
-)
 def test_todos_os_cards_tem_titulo_customizado() -> None:
+    titulos_por_pagina: dict[str, list[str]] = {}
+    problemas = []
     for visual_json in _todos_os_visual_json():
         dados = _load(visual_json)
         if dados.get("visual", {}).get("visualType") != "cardVisual":
             continue
         titulo = dados.get("visual", {}).get("visualContainerObjects", {}).get("title")
-        assert titulo, (
-            f"{visual_json.relative_to(RAIZ)}: card sem "
-            "visualContainerObjects.title customizado"
+        if not titulo:
+            problemas.append(
+                f"{visual_json.relative_to(RAIZ)}: card sem "
+                "visualContainerObjects.title customizado"
+            )
+            continue
+        props = titulo[0]["properties"]
+        if _valor_literal(props["show"]) != "true":
+            problemas.append(
+                f"{visual_json.relative_to(RAIZ)}: title.show deveria ser 'true'"
+            )
+        texto = _valor_literal(props["text"]).strip("'")
+        if not texto:
+            problemas.append(
+                f"{visual_json.relative_to(RAIZ)}: title.text customizado esta vazio"
+            )
+        pagina = visual_json.parents[2].name
+        titulos_por_pagina.setdefault(pagina, []).append(texto)
+    assert not problemas, "\n".join(problemas)
+    for pagina, titulos in titulos_por_pagina.items():
+        duplicados = {t for t in titulos if titulos.count(t) > 1}
+        assert not duplicados, (
+            f"pagina {pagina}: titulos de cardVisual duplicados entre si: {duplicados}"
         )
+
+
+# ---------------------------------------------------------------------
+# Os 4 cardVisual da pagina "00 - Homologacao" que so tinham o nome cru
+# da medida como rotulo (Lote A) -- titulo customizado final + rotulo
+# interno padrao oculto (objects.label.show = false), para nao duplicar
+# a mesma descricao no cartao (titulo customizado + rotulo interno com
+# o nome tecnico da medida).
+# ---------------------------------------------------------------------
+
+TITULOS_FINAIS_CARDS_HOMOLOGACAO = {
+    "054c92b4f9e6d7013999": "Cobertura temporal — Passageiros",
+    "457fa8158ff3cc9eecc7": "Cobertura temporal — Todos",
+    "5d4e214272b61928647e": "Aviso de contexto",
+    "9b2718d6a27380591a8b": "Última atualização",
+}
+
+
+def test_cards_da_homologacao_tem_titulo_final_e_rotulo_interno_oculto() -> None:
+    for visual_id, titulo_esperado in TITULOS_FINAIS_CARDS_HOMOLOGACAO.items():
+        caminho = (
+            PAGES_DIR / "c9a11a04c00a13a84573" / "visuals" / visual_id / "visual.json"
+        )
+        assert caminho.is_file(), f"visual {visual_id} nao encontrado em {caminho}"
+        dados = _load(caminho)
+        visual = dados["visual"]
+        assert visual["visualType"] == "cardVisual", (
+            f"{caminho.relative_to(RAIZ)}: esperado cardVisual, achou "
+            f"{visual['visualType']!r}"
+        )
+
+        props_title = visual["visualContainerObjects"]["title"][0]["properties"]
+        assert _valor_literal(props_title["show"]) == "true", (
+            f"{caminho.relative_to(RAIZ)}: title.show deveria ser 'true'"
+        )
+        assert _valor_literal(props_title["text"]) == f"'{titulo_esperado}'", (
+            f"{caminho.relative_to(RAIZ)}: title.text esperado "
+            f"{titulo_esperado!r}, achou {_valor_literal(props_title['text'])!r}"
+        )
+
+        props_label = visual["objects"]["label"][0]["properties"]
+        assert _valor_literal(props_label["show"]) == "false", (
+            f"{caminho.relative_to(RAIZ)}: objects.label.show deveria ser "
+            "'false' -- senao o rotulo interno com o nome tecnico da medida "
+            "duplica o titulo customizado"
+        )
+
+    # o unico dos 4 que ja tinha 'objects.value'/'objects.label' com outras
+    # propriedades antes desta correcao (o cartao "Aviso de Contexto") deve
+    # preservar essas propriedades -- so 'show' foi acrescentado/ajustado.
+    caminho_aviso = (
+        PAGES_DIR
+        / "c9a11a04c00a13a84573"
+        / "visuals"
+        / "5d4e214272b61928647e"
+        / "visual.json"
+    )
+    objetos_aviso = _load(caminho_aviso)["visual"]["objects"]
+    assert "value" in objetos_aviso, (
+        f"{caminho_aviso.relative_to(RAIZ)}: objects.value deveria ter sido preservado"
+    )
+    props_label_wrap = objetos_aviso["label"][0]["properties"]
+    assert _valor_literal(props_label_wrap["textWrap"]) == "true", (
+        f"{caminho_aviso.relative_to(RAIZ)}: objects.label.textWrap deveria ter "
+        "sido preservado, so 'show' deveria ter sido acrescentado"
+    )
 
 
 # ---------------------------------------------------------------------
