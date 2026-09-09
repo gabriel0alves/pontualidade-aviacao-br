@@ -2,12 +2,12 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
   "name": "3b5d29d157e203c98022",
   "position": {
-    "x": 960,
-    "y": 780,
-    "z": 7000,
-    "height": 260,
-    "width": 460,
-    "tabOrder": 7000
+    "x": 1280,
+    "y": 140,
+    "z": 1200,
+    "height": 55,
+    "width": 600,
+    "tabOrder": 1200
   },
   "visual": {
     "visualType": "slicer",
@@ -41,7 +41,27 @@
             "mode": {
               "expr": {
                 "Literal": {
-                  "Value": "'Basic'"
+                  "Value": "'Dropdown'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "header": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Comparação YTD'"
                 }
               }
             }

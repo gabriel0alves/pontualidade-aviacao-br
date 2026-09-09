@@ -255,15 +255,13 @@ def test_nenhuma_agregacao_implicita_em_nenhum_visual() -> None:
 # ---------------------------------------------------------------------
 
 
-# Excecao unica e deliberada (correcao manual do usuario, pagina
-# "1 - Visao Executiva", validada no Desktop): o segmentador DEDICADO
-# (c67ddd470f6dba47581a, renomeado "Ano fechado -- ICA5/Gini") aponta para
-# MET_ANO[ano], nao para uma DIM_*, porque ICA5%/Gini sao medidas MAXX(...)
-# sobre a propria MET_ANO -- ver test_segmentador_dedicado_usa_met_ano_ano
-# e test_interacoes_isolam_segmentadores_geral_e_dedicado abaixo.
-EXCECAO_SLICER_NAO_DIMENSAO = {
-    ("ac8a1c757eb2fc495fda", "c67ddd470f6dba47581a"): {("MET_ANO", "ano")},
-}
+# Nenhuma excecao ativa no momento -- o unico slicer que apontava para uma
+# MET_* (segmentador dedicado c67ddd470f6dba47581a, "Ano fechado --
+# ICA5/Gini") foi retirado da pagina "1 - Visao Executiva" no Lote B
+# (identidade visual/reformulacao executiva). Mantido como dict vazio, e
+# nao removido, para o padrao ficar pronto caso ICA5/Gini ganhem pagina
+# propria com segmentador dedicado no futuro.
+EXCECAO_SLICER_NAO_DIMENSAO: dict[tuple[str, str], set[tuple[str, str]]] = {}
 
 
 def test_slicers_apontam_para_colunas_de_dimensao() -> None:
@@ -542,9 +540,12 @@ def test_contagem_de_paginas_e_visuais_inalterada() -> None:
         for pasta in _todas_as_paginas()
     }
     assert visuais_por_pagina == {
-        # 9 originais + gráfico de linha (046823e09b34bbe3f930) + textbox
-        # metodológico (46bab3d8ba2ab9822d4e) -- adicionados na correção
-        # das pendências da "1 — Visão Executiva".
+        # Lote B: 11 - 4 (ICA5, Gini, segmentador dedicado MET_ANO,
+        # textbox metodológico) + 5 (cabeçalho, subtítulo, badge "2026
+        # parcial", painel "Leitura executiva", 4º KPI "Voos Válidos").
+        # Lote B.1 (gate visual): o textbox de subtítulo foi mesclado no
+        # cabeçalho (visualContainerObjects.subTitle, mecanismo comprovado
+        # no Desktop) -- 12 - 1 = 11.
         "ac8a1c757eb2fc495fda": 11,
         "c9a11a04c00a13a84573": 10,
     }

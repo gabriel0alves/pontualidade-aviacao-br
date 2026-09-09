@@ -4,57 +4,5 @@
   "displayName": "1 — Visão Executiva",
   "displayOption": "FitToPage",
   "height": 1080,
-  "width": 1920,
-  "visualInteractions": [
-    {
-      "source": "b50a8be0b85264925297",
-      "target": "c35de6645e2ee8b7a0ff",
-      "type": "NoFilter"
-    },
-    {
-      "source": "b50a8be0b85264925297",
-      "target": "5532d7fe39a15cb6cc84",
-      "type": "NoFilter"
-    },
-    {
-      "source": "b50a8be0b85264925297",
-      "target": "c67ddd470f6dba47581a",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "89c54b46c688dca6ca8f",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "184b9188cce8e4ee48a0",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "a34b8851e39817594019",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "b50a8be0b85264925297",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "fc7c5bbbee193e352580",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "3b5d29d157e203c98022",
-      "type": "NoFilter"
-    },
-    {
-      "source": "c67ddd470f6dba47581a",
-      "target": "046823e09b34bbe3f930",
-      "type": "NoFilter"
-    }
-  ]
+  "width": 1920
 }
