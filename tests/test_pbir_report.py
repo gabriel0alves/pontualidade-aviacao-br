@@ -33,7 +33,11 @@ PAGES_DIR = REPORT_DIR / "definition" / "pages"
 TABLES_DIR = SEMANTIC_DIR / "definition" / "tables"
 EXPRESSIONS_TMDL = SEMANTIC_DIR / "definition" / "expressions.tmdl"
 
-PAGE_ORDER_ESPERADA = ["c9a11a04c00a13a84573", "ac8a1c757eb2fc495fda"]
+PAGE_ORDER_ESPERADA = [
+    "c9a11a04c00a13a84573",
+    "ac8a1c757eb2fc495fda",
+    "a91651340266854920a2",
+]
 
 # Campos explicitamente fora do escopo da v1 (destino, codeshare, rota,
 # id_voo -- ver docs/especificacao_powerbi.md secoes 5 e 7).
@@ -534,7 +538,7 @@ def test_cartao_contagem_de_voos_preserva_posicao_tamanho_e_filtro() -> None:
 
 
 def test_contagem_de_paginas_e_visuais_inalterada() -> None:
-    assert len(_todas_as_paginas()) == 2
+    assert len(_todas_as_paginas()) == 3
     visuais_por_pagina = {
         pasta.name: len(list((pasta / "visuals").glob("*/visual.json")))
         for pasta in _todas_as_paginas()
@@ -548,6 +552,11 @@ def test_contagem_de_paginas_e_visuais_inalterada() -> None:
         # no Desktop) -- 12 - 1 = 11.
         "ac8a1c757eb2fc495fda": 11,
         "c9a11a04c00a13a84573": 10,
+        # Lote C1 ("2 -- Pontualidade e Cancelamentos"): cabeçalho, badge
+        # "2026 parcial", 3 slicers (Ano/Regime/YTD), 4 KPIs, gráfico
+        # temporal, ranking por operadora, painel de contexto, card de
+        # cobertura temporal do KPI6 -- 13 visuais.
+        "a91651340266854920a2": 13,
     }
 
 
