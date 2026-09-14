@@ -66,6 +66,11 @@ MEDIDAS_CATEGORIA_A_RODADA_ANTERIOR = [
 
 MEDIDAS_CATEGORIA_B = [
     ("FATO_CURVA_LORENZ.tmdl", "% Acumulado de Impacto (Curva de Lorenz)"),
+    # Lote C2 (pagina 3 "Impacto e Concentracao"): medida tecnica autorizada
+    # MAX(FATO_CURVA_LORENZ[percentil_voos]) -- mesma escala 0-100 e mesmo
+    # formatString escapado da medida acima, usada como referencia visual
+    # y=x no grafico da curva de Lorenz.
+    ("FATO_CURVA_LORENZ.tmdl", "Linha de Igualdade %"),
 ] + [
     (tabela, f"{prefixo} -- {sufixo}")
     for tabela, sufixo in [
@@ -104,7 +109,7 @@ COLUNAS_CATEGORIA_B_FATO_CELULA_P11 = [
     "delta_otp15_subperiodos_pp",
 ]
 
-TOTAL_ESPERADO_ESCAPADO = 30  # 25 medidas B + 5 colunas B (fora de "medida")
+TOTAL_ESPERADO_ESCAPADO = 31  # 26 medidas B (25 + Linha de Igualdade % do Lote C2) + 5 colunas B (fora de "medida")
 TOTAL_ESPERADO_CORRIGIDO = 12  # 10 desta rodada + 2 do KPI6 (rodada anterior)
 
 
@@ -179,10 +184,12 @@ def test_totais_reconciliados_por_categoria() -> None:
     total_c = len(MEDIDAS_CATEGORIA_C)
     total_d = 0
     assert total_a == 12
-    assert total_b == 25
+    # 25 desta auditoria original + 1 (Lote C2: 'Linha de Igualdade %',
+    # FATO_CURVA_LORENZ.tmdl -- ver comentario em MEDIDAS_CATEGORIA_B).
+    assert total_b == 26
     assert total_c == 6
     assert total_d == 0
-    assert total_a + total_b + total_c + total_d == 43
+    assert total_a + total_b + total_c + total_d == 44
 
 
 # ---------------------------------------------------------------------
@@ -235,15 +242,17 @@ def test_categoria_c_gini_nunca_recebe_percentual() -> None:
 
 
 def test_nenhuma_medida_da_lista_de_ambiguas_existe() -> None:
-    """Categoria D ficou vazia nesta auditoria (todas as 43 medidas
-    fecharam evidencia nas camadas 1-7). Este teste e' a salvaguarda: se
-    uma futura medida percentual for adicionada sem evidencia suficiente,
-    ela vai aparecer em test_inventario_cobre_todas_as_medidas_percentuais_do_modelo
+    """Categoria D ficou vazia nesta auditoria (as 43 medidas originais
+    fecharam evidencia nas camadas 1-7; o Lote C2 acrescentou 1 medida
+    tecnica nova -- 'Linha de Igualdade %' -- ja nascida em Categoria B,
+    totalizando 44). Este teste e' a salvaguarda: se uma futura medida
+    percentual for adicionada sem evidencia suficiente, ela vai aparecer
+    em test_inventario_cobre_todas_as_medidas_percentuais_do_modelo
     como 'faltando', nao silenciosamente ignorada."""
     assert len(MEDIDAS_CATEGORIA_A_CORRIGIDAS_NESTA_RODADA) \
         + len(MEDIDAS_CATEGORIA_A_RODADA_ANTERIOR) \
         + len(MEDIDAS_CATEGORIA_B) \
-        + len(MEDIDAS_CATEGORIA_C) == 43
+        + len(MEDIDAS_CATEGORIA_C) == 44
 
 
 # ---------------------------------------------------------------------

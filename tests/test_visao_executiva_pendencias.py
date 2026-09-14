@@ -870,7 +870,14 @@ def test_nenhum_arquivo_do_semantic_model_alterado() -> None:
     (path absoluto de pPowerBIDataRoot, PBI_ResultType de alguma tabela) --
     esse residuo e' revertido manualmente antes de cada rodada (ver
     docstring do modulo), e este teste trava que nenhuma sobra ficou para
-    tras nem foi commitada."""
+    tras nem foi commitada.
+
+    O Lote C2 (pagina 3), posterior a estes lotes, alterou EXATAMENTE 1
+    arquivo do SemanticModel (a medida tecnica autorizada
+    'Linha de Igualdade %' em FATO_CURVA_LORENZ.tmdl -- ver
+    tests/test_impacto_concentracao_pendencias.py). Esse arquivo e' a
+    UNICA excecao tolerada aqui; qualquer outro residuo continua barrado.
+    """
     resultado = subprocess.run(
         ["git", "status", "--porcelain", "--", "powerbi/PontualidadeAviacaoBR.SemanticModel"],
         cwd=RAIZ,
@@ -878,7 +885,10 @@ def test_nenhum_arquivo_do_semantic_model_alterado() -> None:
         text=True,
         check=True,
     )
-    assert resultado.stdout.strip() == "", (
-        "SemanticModel tem alteracoes pendentes -- rodada deveria ser "
-        f"exclusivamente visual:\n{resultado.stdout}"
+    linhas = [l for l in resultado.stdout.splitlines() if l.strip()]
+    excecao_lote_c2 = "powerbi/PontualidadeAviacaoBR.SemanticModel/definition/tables/FATO_CURVA_LORENZ.tmdl"
+    inesperadas = [l for l in linhas if not l.strip().endswith(excecao_lote_c2)]
+    assert not inesperadas, (
+        "SemanticModel tem alteracoes pendentes fora da excecao conhecida do "
+        f"Lote C2:\n{inesperadas}"
     )

@@ -16,6 +16,13 @@ table FATO_CURVA_LORENZ
 		displayFolder: Concentração
 		lineageTag: 658e1711-11f2-41f4-8375-d23e83f652ab
 
+	/// Linha de referencia y=x da curva de Lorenz -- distribuicao perfeitamente uniforme (nenhuma concentracao). Usar SOMENTE no grafico da curva de Lorenz, nunca fora dele.
+	measure 'Linha de Igualdade %' =
+			MAX(FATO_CURVA_LORENZ[percentil_voos])
+		formatString: 0.00\%
+		displayFolder: Apresentação (curva de Lorenz)
+		lineageTag: 52f51588-98c3-41cb-9da4-cab2e8648640
+
 	/// So 'universo' na v1. Tabela DESCONECTADA.
 	column escopo
 		dataType: string

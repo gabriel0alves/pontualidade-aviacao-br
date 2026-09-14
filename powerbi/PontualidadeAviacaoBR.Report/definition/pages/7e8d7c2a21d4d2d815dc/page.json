@@ -1,0 +1,8 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "7e8d7c2a21d4d2d815dc",
+  "displayName": "3 — Impacto e Concentração",
+  "displayOption": "FitToPage",
+  "height": 1080,
+  "width": 1920
+}

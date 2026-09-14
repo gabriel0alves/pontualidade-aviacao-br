@@ -37,6 +37,7 @@ PAGE_ORDER_ESPERADA = [
     "c9a11a04c00a13a84573",
     "ac8a1c757eb2fc495fda",
     "a91651340266854920a2",
+    "7e8d7c2a21d4d2d815dc",
 ]
 
 # Campos explicitamente fora do escopo da v1 (destino, codeshare, rota,
@@ -538,7 +539,7 @@ def test_cartao_contagem_de_voos_preserva_posicao_tamanho_e_filtro() -> None:
 
 
 def test_contagem_de_paginas_e_visuais_inalterada() -> None:
-    assert len(_todas_as_paginas()) == 3
+    assert len(_todas_as_paginas()) == 4
     visuais_por_pagina = {
         pasta.name: len(list((pasta / "visuals").glob("*/visual.json")))
         for pasta in _todas_as_paginas()
@@ -557,6 +558,12 @@ def test_contagem_de_paginas_e_visuais_inalterada() -> None:
         # temporal, ranking por operadora, painel de contexto, card de
         # cobertura temporal do KPI6 -- 13 visuais.
         "a91651340266854920a2": 13,
+        # Lote C2 ("3 -- Impacto e Concentração"): cabeçalho, badge "2026
+        # parcial", contexto discreto do escopo global, 4 KPIs (ICA5,
+        # Gini, Top 10%, Top 20%), evolução por ano fechado, curva de
+        # Lorenz, ranking por operadora, ranking por aeroporto, painel
+        # metodológico -- 12 visuais. Sem slicers (página sem segmentação).
+        "7e8d7c2a21d4d2d815dc": 12,
     }
 
 

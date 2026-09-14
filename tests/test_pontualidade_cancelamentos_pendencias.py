@@ -179,11 +179,13 @@ def test_pagina_2_e_publica_e_incluida_depois_da_pagina_1() -> None:
         "pagina 2 deve ser publica (sem HiddenInViewMode)"
     )
     pages = _pages_json()
-    assert pages["pageOrder"] == [
+    # Lote C2 acrescentou a pagina 3 depois da pagina 2 -- a pagina 2
+    # continua na 3a posicao (indice 2), so' o pageOrder cresceu ao final.
+    assert pages["pageOrder"][:3] == [
         "c9a11a04c00a13a84573",
         "ac8a1c757eb2fc495fda",
         "a91651340266854920a2",
-    ], "ordem de paginas deveria ser 00, 1, 2, nesta ordem"
+    ], "ordem de paginas deveria ser 00, 1, 2, ... nesta ordem"
 
 
 def test_pagina_2_mantem_canvas_16_9_fit_to_page() -> None:
@@ -790,6 +792,12 @@ def test_pagina_00_continua_hiddeninviewmode() -> None:
 
 
 def test_nenhum_arquivo_do_semantic_model_alterado() -> None:
+    """O Lote C1 (pagina 2) e exclusivamente visual. O Lote C2 (pagina 3),
+    posterior, alterou EXATAMENTE 1 arquivo do SemanticModel (a medida
+    tecnica autorizada 'Linha de Igualdade %' em FATO_CURVA_LORENZ.tmdl --
+    ver tests/test_impacto_concentracao_pendencias.py). Esse arquivo e' a
+    UNICA excecao tolerada aqui; qualquer outro residuo (path absoluto,
+    PBI_ResultType extra etc.) continua barrado por este teste."""
     import subprocess
 
     resultado = subprocess.run(
@@ -799,7 +807,10 @@ def test_nenhum_arquivo_do_semantic_model_alterado() -> None:
         text=True,
         check=True,
     )
-    assert resultado.stdout.strip() == "", (
-        "SemanticModel tem alteracoes pendentes -- o Lote C1 e exclusivamente "
-        f"visual (nenhum DAX/M/relacionamento novo):\n{resultado.stdout}"
+    linhas = [l for l in resultado.stdout.splitlines() if l.strip()]
+    excecao_lote_c2 = "powerbi/PontualidadeAviacaoBR.SemanticModel/definition/tables/FATO_CURVA_LORENZ.tmdl"
+    inesperadas = [l for l in linhas if not l.strip().endswith(excecao_lote_c2)]
+    assert not inesperadas, (
+        "SemanticModel tem alteracoes pendentes fora da excecao conhecida do "
+        f"Lote C2:\n{inesperadas}"
     )
