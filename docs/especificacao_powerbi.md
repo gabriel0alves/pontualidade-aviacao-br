@@ -37,6 +37,19 @@ CHEGADA`, cortes de volume) permanecem **centralizadas em `src/regras.py`**.
 O Power BI **consome** flags e classificações já resolvidas pelo pipeline —
 nunca reimplementa a lógica em DAX ou Power Query.
 
+**Nota de atualização (Lote C3 — arquitetura pública final).** O status
+acima ("Especificação aprovada, camada de exportação implementada") e o
+§13 originais descrevem a 6ª rodada, quando nenhuma página visual além de
+`00 — Homologação` existia de fato. Rodadas posteriores (Lotes B, B.1, C1,
+C2, fora da numeração de rodada deste cabeçalho) construíram e
+homologaram estruturalmente **3 páginas públicas** — `1 — Visão
+Executiva`, `2 — Pontualidade e Cancelamentos`, `3 — Impacto e
+Concentração` — mais a página técnica oculta `00 — Homologação`. Essa é
+hoje a arquitetura pública final do relatório; o desenho original de 7
+páginas do §13.1/§13.2 permanece registrado como histórico, mas está
+**parcialmente superado** — ver §13.4 para o que foi efetivamente
+implementado e o que do desenho de 7 páginas não avançou.
+
 ---
 
 ## 1. Objetivo e público do dashboard
@@ -979,18 +992,40 @@ nunca motivo para alterar o valor Python.
 
 ## 13. Páginas, visuais, filtros e navegação
 
-**Status de implementação (atualizado após a rodada de visuais):** esta
-seção descreve o DESENHO-alvo das 7 páginas executivas. Delas, só
+**Status de implementação — SUPERADO EM PARTE, ver §13.4.** Esta seção
+(§13.1–§13.3) descreve o DESENHO-alvo ORIGINAL de 7 páginas executivas,
+escrito antes de qualquer página visual existir. Naquele momento, só
 `00 — Homologação` (técnica, fora desta matriz) e parte de
-`1 — Visão executiva` foram efetivamente construídas e homologadas no
-Power BI Desktop até agora — ver `docs/homologacao_powerbi_rodada7a.md`,
-seção "Gates manuais aprovados", para o que foi de fato validado
-visualmente. As páginas 2–7 permanecem só especificadas, não
-implementadas. Em `1 — Visão executiva`, a implementação real bateu com o
-desenho abaixo: o segmentador `MET_ANO` (linha "1. Visão executiva" desta
-tabela) é de fato single-select obrigatório e independente do slicer
-geral de `DIM_ANO`, e a mensagem de aviso foi implementada (texto exato:
-"ICA5 e Gini estão disponíveis para apenas um ano fechado por vez.").
+`1 — Visão executiva` haviam sido construídas e homologadas no Power BI
+Desktop — ver `docs/homologacao_powerbi_rodada7a.md`, seção "Gates
+manuais aprovados", para o que foi de fato validado visualmente naquele
+ponto. **Isso não reflete mais o estado atual do projeto**: 3 páginas
+públicas completas (mais a `00` oculta) estão implementadas — a
+arquitetura real, com nomes, números e conteúdo por página tal como
+construídos, está em **§13.4**, que é a referência vigente para "quais
+páginas existem e o que cada uma mostra". §13.1–§13.3 permanecem como
+registro do desenho original (nenhuma linha apagada), mas duas
+afirmações abaixo já não são verdade e são marcadas explicitamente:
+
+- Texto original desta seção (mantido literal, não apagado): ~~"Em
+  `1 — Visão executiva`, a implementação real bateu com o desenho abaixo:
+  o segmentador `MET_ANO` (linha "1. Visão executiva" desta tabela) é de
+  fato single-select obrigatório e independente do slicer geral de
+  `DIM_ANO`, e a mensagem de aviso foi implementada (texto exato: "ICA5 e
+  Gini estão disponíveis para apenas um ano fechado por vez.")."~~ —
+  **superado numa rodada posterior (Lote B.1, "gate visual"): o cartão
+  ICA5/Gini e o segmentador dedicado `MET_ANO` foram REMOVIDOS da página
+  1.** ICA5/Gini migraram para a página 3 (`3 — Impacto e Concentração`,
+  escopo `MET_UNIVERSO`, sem segmentador — ver §13.4); a página 1 não tem
+  mais nenhum controle single-select obrigatório.
+- A matriz de §13.1/§13.2 numera "2. Concentração" e "3. Cancelamento";
+  na arquitetura real essas duas trocaram de posição e nome
+  (`2 — Pontualidade e Cancelamentos` e `3 — Impacto e Concentração`,
+  respectivamente) e as páginas 4–7 do desenho original (Aeroporto ×
+  Companhia, Intradiário, Priorização, Diagnóstico KPI7) **ficaram
+  deliberadamente fora da versão pública inicial**, priorizando entregar
+  três páginas completas e homologadas — seguem especificadas como
+  desenho para uma extensão futura, fora do escopo do milestone atual.
 
 ### 13.1 Matriz página × fato × slicers
 
@@ -1166,6 +1201,166 @@ resta na página 7.
 
 Navegação: menu lateral fixo, sem visibilidade condicionada a medida DAX
 dinâmica cara.
+
+*(Nota: "menu lateral fixo" acima é parte do desenho original da página 7,
+que ficou fora da versão pública inicial (§13.5, item 3) — não descreve a
+navegação real do relatório. A navegação efetivamente implementada é a
+nativa por abas do Power BI, documentada em §13.4.)*
+
+---
+
+### 13.4 Arquitetura pública final implementada (Lotes B, B.1, C1, C2, C3)
+
+**Esta é a referência vigente sobre quais páginas existem e o que cada uma
+mostra** — substitui, para as páginas 1–3, o desenho de §13.1/§13.2.
+Verificado estruturalmente contra `powerbi/PontualidadeAviacaoBR.Report/
+definition/pages/pages.json` e os `visual.json` de cada página
+(`tests/test_pbir_report.py`, `tests/test_visao_executiva_pendencias.py`,
+`tests/test_pontualidade_cancelamentos_pendencias.py`,
+`tests/test_impacto_concentracao_pendencias.py`,
+`tests/test_navegacao_consistencia_pendencias.py`).
+
+**Ordem e visibilidade das páginas** (`pageOrder` em `pages.json`, exato):
+
+| Ordem | `name` (id) | `displayName` | Visibilidade |
+|---|---|---|---|
+| 1 | `c9a11a04c00a13a84573` | `00 — Homologação` | `HiddenInViewMode` — oculta na visualização, presente no projeto só para auditoria técnica (mede cobertura temporal, avisos de contexto, diagnósticos internos; nunca aparece para o público do dashboard) |
+| 2 | `ac8a1c757eb2fc495fda` | `1 — Visão Executiva` | pública |
+| 3 | `a91651340266854920a2` | `2 — Pontualidade e Cancelamentos` | pública |
+| 4 | `7e8d7c2a21d4d2d815dc` | `3 — Impacto e Concentração` | pública |
+
+**Navegação: exclusivamente nativa por abas.** Não existe, em nenhuma
+página do relatório, nenhum visual `pageNavigator`, `actionButton` ou
+bookmark de navegação (verificado por busca textual em todos os
+`visual.json` do projeto — nenhuma ocorrência) — o usuário navega só pelas
+abas de página nativas do Power BI, na ordem da tabela acima (com `00`
+oculta dessa lista de abas). Nenhum menu lateral, botão "avançar/voltar"
+ou bookmark foi criado.
+
+**1 — Visão Executiva.** KPIs globais de pontualidade/cancelamento sobre
+`FATO_VOO` (OTP15, Atraso Severo/Cancelamento por passageiro, Minutos de
+Atraso, Voos Válidos), série temporal por mês, painel "Leitura executiva",
+segmentadores de Ano/Regime temporal/YTD. **Não tem mais** cartão
+ICA5/Gini nem segmentador dedicado `MET_ANO` (removidos no Lote B.1 —
+ver nota em §13).
+
+**2 — Pontualidade e Cancelamentos.** Aprofunda pontualidade e
+cancelamento sobre `FATO_VOO`: cartões OTP15, Atraso Severo (>30 min),
+Cancelamento (Passageiros) e Voos Válidos; série temporal de
+pontualidade/atraso severo/cancelamento; gráfico de barras "Taxa de
+cancelamento por operadora" (ranking); painel "Contexto da análise";
+cartão de cobertura temporal do cancelamento (KPI6). Segmentadores de
+Ano/Regime/YTD, mesmo padrão da página 1.
+
+**3 — Impacto e Concentração.** Página **sem nenhum segmentador** — cada
+visual usa uma fonte fixa e explicitamente identificada por escopo, nunca
+misturada com outra granularidade: 4 KPIs globais (ICA5, Gini, Impacto no
+Top 10%, Impacto no Top 20%) de `MET_UNIVERSO` (escopo fixo, período
+completo jul/2019–jun/2026); gráfico de evolução por ano fechado
+(`MET_ANO`, exclusivamente medida ICA5) com filtro de visual
+`DIM_ANO[ano_parcial] = FALSE()` — **2026 é excluído SOMENTE desta
+comparação por ano fechado**, nunca dos 4 KPIs globais nem da curva de
+Lorenz, que cobrem o período completo incluindo 2026; curva de Lorenz
+(`FATO_CURVA_LORENZ`) com a série de referência y=x ("Linha de Igualdade
+%", medida técnica `MAX(FATO_CURVA_LORENZ[percentil_voos])`, Lote C2);
+ranking "Concentração por Operadora" (`MET_OPERADORA`, 5 operadoras com
+volume mínimo do cálculo, ICA5/Gini/Top10%/Top20%, ordenado por ICA5
+decrescente, sem linha de total); ranking "Concentração por Aeroporto"
+(`MET_AEROPORTO` + `DIM_AEROPORTO[descricao_canonica]` como única exceção
+de dimensão descritiva relacionada, 12 aeroportos por volume, mesmas
+métricas, sem linha de total); painel "Como interpretar" com o texto
+metodológico literal (ver abaixo).
+
+**Texto metodológico da página 3 (literal, `visual.json` do painel
+`67156eda5da16ef62a42`):**
+
+> ICA5 representa a parcela dos minutos de atraso concentrada nos 5% de
+> voos de maior impacto. Gini resume a desigualdade dessa distribuição, de
+> 0 para dispersão uniforme a 1 para concentração máxima. São indicadores
+> autorais, não métricas oficiais da ANAC, e não são aditivos.
+>
+> Não somar nem calcular a média de ICA5, Gini ou participações Top-N
+> entre anos, operadoras ou aeroportos.
+
+**Métricas não aditivas — regra vale nas 3 páginas.** ICA5, Gini e as
+participações Top-N/Top10%/Top20% nunca devem ser somadas nem
+promediadas entre anos, operadoras ou aeroportos — cada valor já é uma
+estatística de ordem sobre a distribuição inteira do recorte (§11); a
+página 3 é a única com esse aviso escrito no próprio canvas, mas a regra
+é a mesma onde quer que ICA5/Gini apareçam.
+
+**Elementos de identidade visual consistentes entre as 3 páginas
+públicas** (auditados no Lote C3 — ver §13.5 para as adaptações pontuais
+de layout encontradas na página 3): canvas `1920×1080`,
+`displayOption: FitToPage`; cabeçalho
+navy (`#0F2742`) em `x=40,y=20,altura=90,largura=1840`, título branco
+`#FFFFFF` 28pt, subtítulo `#C9D6E3` 13pt terminando em
+"`| jul/2019 a jun/2026 | Fonte: ANAC`"; badge "2026 parcial" com fundo
+`#FDECEC`/borda `#F3C7C5`/raio 20px; cartões KPI com título `#1F2937`
+14pt, borda `#E5E7EB`, valor 28pt, rótulo de categoria interno oculto.
+
+**Fontes fixas por escopo (página 3) — nenhuma mistura de grão.** Cada
+visual da página 3 usa exatamente uma tabela de referência por escopo
+(`MET_UNIVERSO`/`MET_ANO`/`MET_OPERADORA`/`MET_AEROPORTO`) ou
+`FATO_CURVA_LORENZ`, nunca combinadas entre si num mesmo visual — a única
+exceção documentada é `DIM_AEROPORTO[descricao_canonica]` no ranking de
+aeroportos, uma dimensão descritiva relacionada, não uma métrica de outro
+escopo (`tests/test_impacto_concentracao_pendencias.py::
+test_ranking_aeroportos_usa_met_aeroporto_e_apenas_dimensao_descritiva_
+relacionada`).
+
+**Ausência de nomes técnicos visíveis.** Em nenhuma das 3 páginas
+públicas aparece, em texto visível (título, subtítulo ou parágrafo),
+o nome técnico interno de uma medida/coluna (ex. `ICA5 % -- Universo`,
+`operadora_analitica`, `percentil_voos`) — sempre um rótulo amigável
+(`displayName` da projeção ou texto customizado do título/subtítulo).
+
+**`pPowerBIDataRoot` — parâmetro local, não versionado com valor real.**
+As 19 consultas de origem (todas as páginas, todas as tabelas `MET_*`/
+`FATO_*`) apontam para `data/powerbi/*.parquet` através do parâmetro
+`pPowerBIDataRoot`, versionado em `expressions.tmdl` só com o placeholder
+inválido `<CONFIGURE-O-CAMINHO-LOCAL>\data\powerbi` — cada
+desenvolvedor/máquina configura o caminho absoluto real localmente, sem
+commitá-lo. Ver `powerbi/README.md` (seção "Configuração obrigatória
+antes do primeiro uso") para o procedimento completo — não duplicado
+aqui.
+
+### 13.5 Adaptações de layout e escopo da V1 (auditoria de consistência, Lote C3)
+
+Diferenças pontuais encontradas ao comparar as páginas 1, 2 e 3 lado a
+lado — cada uma é uma adaptação deliberada ao conteúdo específico daquela
+página, não uma inconsistência a corrigir; registradas aqui para
+transparência:
+
+1. **O badge "2026 parcial" da página 3 é mais largo porque carrega a
+   ressalva completa sobre 2026.** Nas páginas 1 e 2, o badge fica em
+   `x=1650,y=25,altura=45,largura=230`, com o texto "2026 parcial •
+   jan–jun". Na página 3, em `x=1460,y=45,altura=45,largura=420`, com o
+   texto "2026 parcial • jan–jun — excluído da comparação por ano
+   fechado" — a ressalva adicional é necessária porque a página 3 é a
+   única com um gráfico de evolução por ano fechado, onde a exclusão de
+   2026 precisa ficar explícita no próprio badge. Cor de fundo, cor de
+   borda e raio são idênticos nas 3 páginas — a largura acompanha o
+   texto, o design system não muda.
+2. **Os cartões KPI da página 3 usam altura de 180px para acomodar dois
+   gráficos, dois rankings e o painel metodológico na mesma página.** Nas
+   páginas 1 e 2, os cartões têm `altura=200` (`y=215`); na página 3,
+   `altura=180` (`y=132`) — a página 3 concentra mais conteúdo vertical
+   (evolução anual, curva de Lorenz, ranking de operadoras, ranking de
+   aeroportos e painel "Como interpretar") do que as páginas 1 e 2, e a
+   altura mais compacta dos cartões é o que viabiliza caber tudo isso sem
+   rolagem. Título, borda, cor e tamanho de fonte dos cartões são
+   idênticos nas 3 páginas — só a altura do contêiner se adapta ao
+   conteúdo da página.
+3. **As páginas 4–7 do desenho original (§13.1/§13.2)** — Aeroporto ×
+   Companhia (H2/P3/P6), Intradiário (H3/H4/P8), Priorização (P11),
+   Diagnóstico de qualidade (KPI7) — **ficaram deliberadamente fora da
+   versão pública inicial**, priorizando entregar três páginas completas
+   e homologadas (1, 2 e 3) em vez de sete páginas parciais. Seguem
+   especificadas (texto/DAX propostos) como desenho para uma extensão
+   futura, fora do escopo dos Lotes B/C. Qualquer menção a essas páginas
+   em §2, §4.1 ou §13.1-13.2 como "já implementadas" deve ser lida como
+   o desenho-alvo dessa extensão futura, não como o estado atual.
 
 ---
 
@@ -1359,11 +1554,49 @@ verificação visual próprios, quando isso for pedido explicitamente.
     - gráfico de linha OTP15 (eixo primário) × cancelamento (eixo
       secundário) ao longo do tempo, título/legenda visíveis, subtítulo
       automático oculto.
-    Páginas 2–7 do §13 permanecem não implementadas.
+    Páginas 2–7 do §13 permanecem não implementadas. **Superado pelos
+    itens 13–15 abaixo:** as páginas 2 e 3 (numeração/nomes reais, não os
+    do §13 original) foram construídas em lotes posteriores; as páginas
+    4–7 do desenho original de 7 páginas ficaram deliberadamente fora da
+    versão pública inicial (§13.5, item 3).
+13. **Aprovada e implementada (Lote B.1, "gate visual", posterior ao item
+    12):** remoção do cartão ICA5/Gini e do segmentador dedicado
+    `MET_ANO` da página `1 — Visão Executiva` — ver nota em §13 e §13.4.
+    ICA5/Gini passam a viver exclusivamente na página 3 (item 14).
+14. **Aprovada e implementada (Lote C1):** página pública
+    `2 — Pontualidade e Cancelamentos` (id `a91651340266854920a2`) — 13
+    visuais sobre `FATO_VOO` (cartões OTP15/Atraso Severo/Cancelamento/
+    Voos Válidos, série temporal, ranking de cancelamento por operadora,
+    painel de contexto, cartão de cobertura temporal do KPI6). Rodada
+    exclusivamente visual — nenhum arquivo do `SemanticModel` alterado
+    (`tests/test_pontualidade_cancelamentos_pendencias.py`).
+15. **Aprovada e implementada (Lote C2):** página pública
+    `3 — Impacto e Concentração` (id `7e8d7c2a21d4d2d815dc`) — 12
+    visuais, sem segmentadores, fontes fixas por escopo
+    (`MET_UNIVERSO`/`MET_ANO`/`MET_OPERADORA`/`MET_AEROPORTO`/
+    `FATO_CURVA_LORENZ`), exclusão de 2026 só na comparação por ano
+    fechado, curva de Lorenz com a nova medida técnica autorizada
+    `Linha de Igualdade %` (`FATO_CURVA_LORENZ.tmdl`, única alteração do
+    `SemanticModel` nesse lote), rankings de 5 operadoras/12 aeroportos
+    sem linha de total, painel metodológico com o texto reproduzido em
+    §13.4. Ver `tests/test_impacto_concentracao_pendencias.py` (865
+    linhas de teste, contrato completo da página).
+16. **Aprovada e implementada (Lote C3, este lote):** consolidação da
+    arquitetura pública final em §13.4/§13.5 (3 páginas públicas + `00`
+    oculta, navegação nativa por abas confirmada — sem
+    `pageNavigator`/bookmark/`actionButton` em nenhum `visual.json` do
+    projeto), auditoria de consistência entre páginas 1/2/3 (§13.5) e
+    testes de regressão de navegação/consistência
+    (`tests/test_navegacao_consistencia_pendencias.py`). Rodada
+    exclusivamente de documentação e teste — nenhum `visual.json`, TMDL,
+    DAX, Power Query, relacionamento ou Parquet alterado.
 
 **Fechamento da rodada de exportação Python:** nenhum `.pbix`/`.pbit`
 havia sido criado até essa rodada — só a camada de exportação Python
 (tabelas de consumo + contratos de teste). A construção visual (decisão
 12 acima) veio numa rodada posterior, também por instrução explícita do
 usuário, e permanece parcial (só `00 — Homologação` e parte de
-`1 — Visão executiva`).
+`1 — Visão executiva`). **Superado pelos itens 13–16:** a construção
+visual avançou para as 3 páginas públicas completas descritas em §13.4;
+o `.pbix`/`.pbit` continua não criado (fora de escopo — este projeto
+permanece nativamente PBIP).
