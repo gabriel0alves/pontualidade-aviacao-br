@@ -26,7 +26,7 @@ Decisoes de arquitetura desta pagina (aprovadas antes da implementacao):
   sucesso -- mesma disciplina do barChart no Lote C1.
 - KPIs globais (MET_UNIVERSO) e curva de Lorenz (FATO_CURVA_LORENZ) NAO
   tem nenhum filtro de visual -- continuam cobrindo o periodo global
-  completo (jul/2019 a jun/2026), incluindo 2026. A exclusao de 2026 vale
+  completo (jan/2019 a jun/2026), incluindo 2026. A exclusao de 2026 vale
   SOMENTE para o grafico de evolucao por ano fechado (dado que MET_ANO
   tem granularidade ano, diferente do escopo agregado de MET_UNIVERSO e
   FATO_CURVA_LORENZ).
@@ -228,7 +228,7 @@ def test_cabecalho_titulo_subtitulo_e_faixa_navy_exatos() -> None:
     assert _valor_literal(subtitulo["show"]) == "true"
     assert _valor_literal(subtitulo["text"]) == (
         "'Distribuição dos minutos de atraso e concentração do impacto "
-        "| jul/2019 a jun/2026 | Fonte: ANAC'"
+        "| jan/2019 a jun/2026 | Fonte: ANAC'"
     )
     assert _cor_fill(vco["background"][0]) == "'#0F2742'"
 
@@ -335,7 +335,7 @@ def test_kpis_globais_nao_somam_nem_promediam_e_tem_contexto_global() -> None:
     contexto = _visual(ID_CAPTION_GLOBAL)
     paragrafos = contexto["visual"]["objects"]["general"][0]["properties"]["paragraphs"]
     textos = [run["value"] for p in paragrafos for run in p["textRuns"]]
-    assert textos == ["Escopo global • jul/2019 a jun/2026"]
+    assert textos == ["Escopo global • jan/2019 a jun/2026"]
 
 
 # ---------------------------------------------------------------------

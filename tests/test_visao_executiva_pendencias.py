@@ -744,7 +744,7 @@ def test_cabecalho_e_faixa_navy_com_titulo_branco_e_subtitulo_claro() -> None:
     assert _valor_literal(subtitulo["show"]) == "true"
     assert (
         _valor_literal(subtitulo["text"])
-        == "'Visão executiva dos voos programados | jul/2019 a jun/2026 | Fonte: ANAC'"
+        == "'Visão executiva dos voos programados | jan/2019 a jun/2026 | Fonte: ANAC'"
     )
 
     assert _cor_fill(vco["background"][0]) == "'#0F2742'"

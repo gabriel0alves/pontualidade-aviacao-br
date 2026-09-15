@@ -41,6 +41,17 @@ PAGES_DIR = REPORT_DIR / "definition" / "pages"
 DOC_ESPECIFICACAO = RAIZ / "docs" / "especificacao_powerbi.md"
 
 COMMIT_BASE_C2 = "71296b3"
+# HEAD do Lote C3 (fim do lote anterior a este) -- usado para travar, entre
+# DOIS COMMITS FIXOS (nao commit-base vs. working tree), o que o Lote C3
+# realmente tocou. Comparar contra working tree faria esses testes falharem
+# para sempre a partir do primeiro lote seguinte que legitimamente editasse
+# Report/SemanticModel/README (como o D0.1 edita 4 visual.json) -- bug
+# encontrado e corrigido no proprio D0.1.
+COMMIT_C3 = "46b17b5"
+# HEAD do Lote D0.1 (este lote) sera o commit deste trabalho -- usado para
+# guardas que validam o WORKING TREE atual (ainda nao commitado) contra o
+# estado imediatamente anterior a este lote.
+COMMIT_BASE_D01 = "46b17b5"
 
 ID_PAGINA_00 = "c9a11a04c00a13a84573"
 ID_PAGINA_1 = "ac8a1c757eb2fc495fda"
@@ -113,10 +124,12 @@ def _todos_os_visual_json() -> list[Path]:
 
 
 def _todos_os_visual_json_publicos() -> list[Path]:
+    # caminho: .../pages/<page_id>/visuals/<visual_id>/visual.json
+    # parents[0]=<visual_id>, parents[1]="visuals", parents[2]=<page_id>
     return sorted(
         p
         for p in _todos_os_visual_json()
-        if p.parents[1].name in PAGINAS_PUBLICAS
+        if p.parents[2].name in PAGINAS_PUBLICAS
     )
 
 
@@ -221,7 +234,7 @@ def test_cabecalho_navy_consistente_entre_paginas_1_2_3() -> None:
 
         subtitulo = vco["subTitle"][0]["properties"]
         assert _lit(subtitulo["show"]) == "true"
-        assert _lit(subtitulo["text"]).endswith("| jul/2019 a jun/2026 | Fonte: ANAC'"), (
+        assert _lit(subtitulo["text"]).endswith("| jan/2019 a jun/2026 | Fonte: ANAC'"), (
             f"{page_id}: subtitulo do cabecalho deveria terminar com o sufixo padrao de fonte/periodo"
         )
         cores_subtitulo.add(subtitulo["fontColor"]["solid"]["color"]["expr"]["Literal"]["Value"])
@@ -486,27 +499,50 @@ def test_nenhum_nome_tecnico_visivel_nas_3_paginas_publicas() -> None:
 
 
 def test_nenhum_arquivo_de_pagina_alterado_no_c3() -> None:
-    saida = _git("diff", "--name-only", COMMIT_BASE_C2, "--", str(REPORT_DIR))
+    """Compara DOIS COMMITS FIXOS (71296b3..46b17b5 -- o intervalo exato do
+    Lote C3), nao commit-base vs. working tree -- assim o teste continua
+    valido para sempre, mesmo depois que um lote posterior (D0.1) editar
+    Report legitimamente."""
+    saida = _git("diff", "--name-only", COMMIT_BASE_C2, COMMIT_C3, "--", str(REPORT_DIR))
     arquivos = [l for l in saida.splitlines() if l.strip()]
     assert not arquivos, (
         f"Lote C3 e' documentacao/testes apenas -- nenhum arquivo do Report deveria "
-        f"ter mudado desde {COMMIT_BASE_C2}, encontrado:\n{arquivos}"
+        f"ter mudado entre {COMMIT_BASE_C2} e {COMMIT_C3}, encontrado:\n{arquivos}"
     )
 
 
 def test_nenhum_semanticmodel_alterado_no_c3() -> None:
-    saida = _git("diff", "--name-only", COMMIT_BASE_C2, "--", str(SEMANTIC_DIR))
+    saida = _git("diff", "--name-only", COMMIT_BASE_C2, COMMIT_C3, "--", str(SEMANTIC_DIR))
     arquivos = [l for l in saida.splitlines() if l.strip()]
     assert not arquivos, (
         f"Lote C3 e' documentacao/testes apenas -- nenhum arquivo do SemanticModel "
-        f"deveria ter mudado desde {COMMIT_BASE_C2}, encontrado:\n{arquivos}"
+        f"deveria ter mudado entre {COMMIT_BASE_C2} e {COMMIT_C3}, encontrado:\n{arquivos}"
     )
 
 
 def test_nenhum_parquet_alterado_no_c3() -> None:
-    saida = _git("diff", "--name-only", COMMIT_BASE_C2, "--", "*.parquet")
+    saida = _git("diff", "--name-only", COMMIT_BASE_C2, COMMIT_C3, "--", "*.parquet")
     arquivos = [l for l in saida.splitlines() if l.strip()]
     assert not arquivos, f"nenhum .parquet deveria ter mudado no C3, encontrado:\n{arquivos}"
+
+
+def test_nenhum_semanticmodel_ou_dado_alterado_no_d01() -> None:
+    """Guarda do Lote D0.1 (working tree atual, ainda nao commitado, contra
+    o HEAD do C3): a correcao de 'jul/2019' -> 'jan/2019' e' estritamente
+    textual em 4 visual.json do Report -- nao pode tocar SemanticModel,
+    TMDL, DAX, M nem nenhum Parquet."""
+    saida_modelo = _git("diff", "--name-only", COMMIT_BASE_D01, "--", str(SEMANTIC_DIR))
+    arquivos_modelo = [l for l in saida_modelo.splitlines() if l.strip()]
+    assert not arquivos_modelo, (
+        f"Lote D0.1 e' correcao de texto apenas -- nenhum arquivo do SemanticModel "
+        f"deveria ter mudado desde {COMMIT_BASE_D01}, encontrado:\n{arquivos_modelo}"
+    )
+
+    saida_parquet = _git("diff", "--name-only", COMMIT_BASE_D01, "--", "*.parquet")
+    arquivos_parquet = [l for l in saida_parquet.splitlines() if l.strip()]
+    assert not arquivos_parquet, (
+        f"nenhum .parquet deveria ter mudado no D0.1, encontrado:\n{arquivos_parquet}"
+    )
 
 
 # ---------------------------------------------------------------------
@@ -549,6 +585,93 @@ def test_documentacao_registra_as_adaptacoes_de_layout_da_pagina_3() -> None:
 
 
 def test_documentacao_nao_alterou_readme_nesta_etapa() -> None:
-    saida = _git("diff", "--name-only", COMMIT_BASE_C2, "--", "powerbi/README.md", "README.md")
+    saida = _git("diff", "--name-only", COMMIT_BASE_C2, COMMIT_C3, "--", "powerbi/README.md", "README.md")
     arquivos = [l for l in saida.splitlines() if l.strip()]
     assert not arquivos, f"README nao deveria ser alterado no Lote C3, encontrado:\n{arquivos}"
+
+
+def test_readme_nao_alterado_no_d01() -> None:
+    saida = _git("diff", "--name-only", COMMIT_BASE_D01, "--", "powerbi/README.md", "README.md")
+    arquivos = [l for l in saida.splitlines() if l.strip()]
+    assert not arquivos, f"README nao deveria ser alterado no Lote D0.1, encontrado:\n{arquivos}"
+
+
+# ---------------------------------------------------------------------
+# 11) Periodo exibido (Lote D0.1) -- "jan/2019 a jun/2026" reconciliado
+#     com os dados reais, sem nenhum "jul/2019" residual em texto publico
+# ---------------------------------------------------------------------
+
+
+def test_nenhum_jul_2019_em_texto_visivel_publico() -> None:
+    """Achado do Lote D0 (auditoria de prontidao): os cabecalhos/legendas
+    das 3 paginas publicas diziam "jul/2019", mas o dado real comeca em
+    jan/2019 -- volume mensal substancial em jan-jun/2019 (61 a 76 mil
+    voos/mes), nenhum filtro de relatorio/pagina/visual excluindo esses
+    meses, e DIM_ANO[ano_parcial] = False para 2019 (so' 2026 e' parcial).
+    Corrigido para "jan/2019" nas 4 ocorrencias encontradas por varredura
+    programatica em todo o Report (sem lista de IDs presumida) -- ver
+    Lote D0.1."""
+    problemas = []
+    for visual_json in _todos_os_visual_json_publicos():
+        dados = json.loads(visual_json.read_text(encoding="utf-8"))
+        for texto in _textos_visiveis_do_visual(dados):
+            if texto and "jul/2019" in texto:
+                problemas.append(
+                    f"{visual_json.relative_to(RAIZ)}: texto visivel {texto!r} ainda contem 'jul/2019'"
+                )
+    assert not problemas, "\n".join(problemas)
+
+
+def test_periodo_jan_2019_a_jun_2026_presente_nas_3_paginas_publicas() -> None:
+    """Exatamente 4 ocorrencias esperadas: os 3 subtitulos de cabecalho
+    (paginas 1, 2, 3) + a legenda 'Escopo global' da pagina 3."""
+    ocorrencias = 0
+    for visual_json in _todos_os_visual_json_publicos():
+        dados = json.loads(visual_json.read_text(encoding="utf-8"))
+        for texto in _textos_visiveis_do_visual(dados):
+            if texto and "jan/2019 a jun/2026" in texto:
+                ocorrencias += 1
+    assert ocorrencias == 4, (
+        f"esperado exatamente 4 ocorrencias de 'jan/2019 a jun/2026', encontrado {ocorrencias}"
+    )
+
+
+def test_datas_min_max_reconciliadas_com_os_dados_reais() -> None:
+    """O texto do periodo so' e' correto se bater com a data minima/maxima
+    REAL do dado -- nao basta a data minima do Parquet isolada: confirma
+    tambem que jan-jun/2019 tem volume substancial (nao residual/quase
+    vazio) e que 2019 nao esta marcado como ano_parcial em DIM_ANO (unica
+    regra do modelo que excluiria um ano de uma comparacao)."""
+    pytest.importorskip("pandas")
+    pytest.importorskip("pyarrow")
+    import pandas as pd
+
+    caminho_fato = RAIZ / "data" / "powerbi" / "FATO_VOO.parquet"
+    caminho_dim_ano = RAIZ / "data" / "powerbi" / "DIM_ANO.parquet"
+    caminho_voos = RAIZ / "data" / "processed" / "voos.parquet"
+    if not caminho_fato.is_file() or not caminho_dim_ano.is_file():
+        pytest.skip("data/powerbi/*.parquet nao encontrado neste checkout")
+
+    fato = pd.read_parquet(caminho_fato, columns=["data_partida_prevista"])
+    col = fato["data_partida_prevista"]
+    assert col.min() == pd.Timestamp("2019-01-01"), "FATO_VOO.parquet deveria comecar em 2019-01-01"
+    assert col.max() == pd.Timestamp("2026-06-30"), "FATO_VOO.parquet deveria terminar em 2026-06-30"
+
+    if caminho_voos.is_file():
+        voos = pd.read_parquet(caminho_voos, columns=["partida_prevista"])
+        assert voos["partida_prevista"].min().normalize() == pd.Timestamp("2019-01-01")
+        assert voos["partida_prevista"].max().normalize() == pd.Timestamp("2026-06-30")
+
+    dim_ano = pd.read_parquet(caminho_dim_ano)
+    linha_2019 = dim_ano.loc[dim_ano["ano"] == 2019]
+    assert len(linha_2019) == 1, "DIM_ANO deveria ter exatamente 1 linha para o ano 2019"
+    assert bool(linha_2019["ano_parcial"].iloc[0]) is False, (
+        "2019 nao deveria estar marcado como ano_parcial -- nao ha regra documentada "
+        "que justifique excluir jan-jun/2019 do periodo exibido"
+    )
+
+    voos_jan_jun_2019 = fato[(col >= "2019-01-01") & (col < "2019-07-01")]
+    assert len(voos_jan_jun_2019) > 300_000, (
+        "jan-jun/2019 deveria ter volume substancial (nao residual) -- "
+        f"encontrado {len(voos_jan_jun_2019)} registros"
+    )
