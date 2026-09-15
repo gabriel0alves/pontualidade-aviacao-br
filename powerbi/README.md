@@ -19,6 +19,11 @@ powerbi/
 └── PontualidadeAviacaoBR.SemanticModel/  (TMDL)
 ```
 
+## Versão do Power BI Desktop
+
+Utilize uma versão atual do Power BI Desktop com suporte a projetos PBIP e
+definições PBIR. Disponível na Microsoft Store ou no site oficial.
+
 ## Configuração obrigatória antes do primeiro uso: `pPowerBIDataRoot`
 
 As 19 consultas de origem apontam para os arquivos Parquet através de um
@@ -64,6 +69,15 @@ caminho de outra pessoa.
    Isso está no checklist de encerramento de toda rodada que edita o
    modelo (ver `docs/especificacao_powerbi.md` e o histórico de commits).
 
+### Erro "Caracteres inválidos no caminho"
+
+Esse erro ocorre quando o placeholder versionado (`<CONFIGURE-O-CAMINHO-
+LOCAL>\data\powerbi`) **não foi totalmente substituído** — os caracteres
+`<` e `>` do placeholder não são válidos em um caminho do Windows, e é
+exatamente isso que o Power BI está reportando. Corrija substituindo o
+placeholder inteiro (`<` e `>` incluídos) pelo caminho absoluto real do
+seu clone, como no passo 3 acima.
+
 ### Limitação registrada
 
 Não há refresh "zero-config" em outra máquina. Cada desenvolvedor precisa
@@ -81,7 +95,56 @@ Query/TMDL para parâmetros de texto, não uma omissão de implementação.
 * Fechar completamente o Power BI Desktop antes de qualquer edição externa
   de TMDL/PBIR; nunca editar os dois ao mesmo tempo.
 
-## Escopo desta rodada (7A) e progresso desde então
+## Estado atual do relatório
+
+O relatório tem hoje **3 páginas públicas completas**, homologadas
+estruturalmente e cobertas por testes automatizados, mais a página técnica
+oculta `00 — Homologação` — essa é a arquitetura pública final (detalhe
+completo em `docs/especificacao_powerbi.md` §13.4):
+
+| Página | Visibilidade | Conteúdo |
+|---|---|---|
+| `00 — Homologação` | oculta (`HiddenInViewMode`) — só para auditoria técnica | cobertura temporal, avisos de contexto, diagnósticos internos |
+| `1 — Visão Executiva` | pública | KPIs globais de pontualidade/cancelamento, série temporal mensal |
+| `2 — Pontualidade e Cancelamentos` | pública | aprofundamento por operadora, ranking de cancelamento |
+| `3 — Impacto e Concentração` | pública | ICA5, Gini, curva de Lorenz, rankings de operadoras/aeroportos |
+
+**Navegação:** exclusivamente **nativa por abas** — nenhum Page Navigator,
+bookmark ou botão customizado em nenhuma página (verificado por
+`tests/test_navegacao_consistencia_pendencias.py`).
+
+**Período:** todas as páginas públicas cobrem **jan/2019 a jun/2026**, com
+**2026 sempre rotulado como parcial** — a exclusão de 2026 vale só para o
+gráfico de evolução por ano fechado da página 3.
+
+As páginas 4–7 do desenho original de 7 páginas (Aeroporto × Companhia,
+Intradiário, Priorização, Diagnóstico de qualidade) ficaram deliberadamente
+fora desta versão pública, priorizando entregar 3 páginas completas em vez
+de 7 parciais — seguem especificadas como desenho para uma extensão futura
+(`docs/especificacao_powerbi.md` §13.5, item 3).
+
+### Testes
+
+A suíte completa (`pytest -q`, na raiz do repositório) cobre o relatório
+Power BI junto com o pipeline Python. Para rodar só os testes do
+relatório:
+
+```bash
+pytest tests/test_pbir_report.py -q
+pytest tests/test_visao_executiva_pendencias.py -q
+pytest tests/test_pontualidade_cancelamentos_pendencias.py -q
+pytest tests/test_impacto_concentracao_pendencias.py -q
+pytest tests/test_navegacao_consistencia_pendencias.py -q
+```
+
+Eles validam a FORMA dos arquivos texto (JSON válido, IDs únicos,
+referências existentes, ausência de nomes técnicos visíveis, ausência de
+navegação customizada, nenhum caminho absoluto fora de
+`pPowerBIDataRoot`) — não o comportamento do motor do Power BI. Abrir o
+`.pbip` no Desktop continua sendo a única fonte de verdade sobre layout,
+refresh e cálculo DAX renderizado.
+
+## Histórico — escopo original da Rodada 7A
 
 Escopo original da 7A: modelo semântico completo (19 tabelas,
 relacionamentos, medidas) + consultas DAX de homologação + uma única
@@ -93,6 +156,7 @@ construída e parcialmente homologada (cartões OTP15/Cancelamento/
 Minutos/ICA5/Gini, dois segmentadores de ano independentes, gráfico de
 série temporal) — ver `docs/homologacao_powerbi_rodada7a.md`, seção
 "Gates manuais aprovados", para o que foi de fato validado no Power BI
-Desktop, e `docs/especificacao_powerbi.md` §13 para o desenho completo
-das 7 páginas (a maioria ainda não implementada). Não considere a página
-1 "pronta" além do que essa seção documenta como aprovado.
+Desktop naquele momento. ~~Não considere a página 1 "pronta" além do que
+essa seção documenta como aprovado.~~ **Superado** — ver "Estado atual do
+relatório" acima: as páginas 1, 2 e 3 estão hoje completas e cobertas por
+testes automatizados.

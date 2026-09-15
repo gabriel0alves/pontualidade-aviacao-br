@@ -48,10 +48,13 @@ COMMIT_BASE_C2 = "71296b3"
 # Report/SemanticModel/README (como o D0.1 edita 4 visual.json) -- bug
 # encontrado e corrigido no proprio D0.1.
 COMMIT_C3 = "46b17b5"
-# HEAD do Lote D0.1 (este lote) sera o commit deste trabalho -- usado para
-# guardas que validam o WORKING TREE atual (ainda nao commitado) contra o
-# estado imediatamente anterior a este lote.
+# HEAD do Lote D0.1 (commit "fix(powerbi): corrige periodo exibido para
+# jan/2019"). Par com COMMIT_D01 abaixo: mesmo padrao do COMMIT_BASE_C2/
+# COMMIT_C3 acima -- dois commits FIXOS, nao commit-base vs. working tree,
+# para o teste continuar valido depois que o D1 editar README.md/
+# powerbi/README.md legitimamente.
 COMMIT_BASE_D01 = "46b17b5"
+COMMIT_D01 = "610c47f"
 
 ID_PAGINA_00 = "c9a11a04c00a13a84573"
 ID_PAGINA_1 = "ac8a1c757eb2fc495fda"
@@ -591,7 +594,12 @@ def test_documentacao_nao_alterou_readme_nesta_etapa() -> None:
 
 
 def test_readme_nao_alterado_no_d01() -> None:
-    saida = _git("diff", "--name-only", COMMIT_BASE_D01, "--", "powerbi/README.md", "README.md")
+    """Dois commits fixos (46b17b5..610c47f) -- o D0.1 realmente foi so'
+    correcao de texto/teste, README nao mudou nesse intervalo. O D1
+    seguinte edita README.md/powerbi/README.md legitimamente; comparar
+    contra working tree faria este teste falhar para sempre a partir do
+    D1 (mesmo bug ja corrigido nas guardas do C3 acima)."""
+    saida = _git("diff", "--name-only", COMMIT_BASE_D01, COMMIT_D01, "--", "powerbi/README.md", "README.md")
     arquivos = [l for l in saida.splitlines() if l.strip()]
     assert not arquivos, f"README nao deveria ser alterado no Lote D0.1, encontrado:\n{arquivos}"
 

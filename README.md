@@ -7,10 +7,31 @@ ANAC.
 > **Status:** Blocos **A** (universo analítico), **B** (série temporal), **C**
 > (aeroporto vs companhia — H2/P3/P6), **D** (concentração), **E** (dimensões
 > e intradiário — H3/H4/P8) e **F** (priorização — P11) concluídos e
-> auditados. Só a camada de visualização (Bloco G) e o dashboard **ainda não
-> foram implementados** — o Power BI não foi iniciado, por instrução
-> explícita — ver [`docs/ROADMAP.md`](docs/ROADMAP.md) e
+> auditados. Dashboard Power BI implementado, com **3 páginas públicas**
+> (`1 — Visão Executiva`, `2 — Pontualidade e Cancelamentos`,
+> `3 — Impacto e Concentração`) mais a página técnica oculta
+> `00 — Homologação` — ver [`powerbi/README.md`](powerbi/README.md) e
+> [`docs/especificacao_powerbi.md`](docs/especificacao_powerbi.md) (§13.4).
+> Detalhe do pipeline em [`docs/ROADMAP.md`](docs/ROADMAP.md) e
 > [`docs/status_projeto.md`](docs/status_projeto.md).
+
+---
+
+## Resumo executivo
+
+- **O quê:** pipeline Python auditável (ingestão → limpeza → 6 blocos de
+  análise) sobre 5,45M voos domésticos da ANAC, mais um dashboard Power BI
+  de 3 páginas públicas.
+- **Pergunta central:** onde se concentra o atraso na aviação doméstica
+  brasileira, e onde priorizar investimento operacional.
+- **Achado principal:** 5% dos voos concentram 56,21% dos minutos de
+  atraso (ICA5) — confirmado contra modelos nulos, não é artefato de
+  cálculo (ver "Resultados confirmados" abaixo).
+- **Rigor:** 480+ testes automatizados (regras do pipeline, contrato de
+  dados e estrutura do relatório Power BI); 5 achados anteriores auditados
+  e corrigidos publicamente (ver "Correções metodológicas registradas").
+- **Stack:** Python, pandas, PyArrow · Power BI (PBIP/PBIR, TMDL, DAX) ·
+  pytest.
 
 ---
 
@@ -81,6 +102,7 @@ data/
   raw/         90 CSVs da ANAC — camada bruta, imutável, não versionada
   interim/     vra.parquet   — consolidado e tipado, SEM limpeza
   processed/   voos.parquet  — universo analítico + campos derivados
+  powerbi/     19 tabelas de consumo do dashboard — saída local gerada, ignorada pelo Git
 src/
   regras.py                    fonte ÚNICA dos parâmetros analíticos
   01_ingest.py                 download idempotente e retomável
@@ -92,9 +114,11 @@ src/
   07_bloco_c_aeroporto_vs_companhia.py   Bloco C: H2, P3, P6
   08_bloco_f_priorizacao.py              Bloco F: P11 (ranking, 12 meses)
   09_bloco_e_dimensoes_intradiario.py    Bloco E: H3, H4, P8, KPI 2/3/5
-tests/                         testes das regras críticas (pytest)
+  10_exportar_powerbi.py                 exporta as 19 tabelas do dashboard
+tests/                         testes do pipeline e do relatório Power BI (pytest)
 docs/                          documentação metodológica (parte gerada por script)
-notebooks/ powerbi/ sql/ reports/   ainda vazios — ver ROADMAP
+powerbi/                       dashboard Power BI (PBIP/PBIR/TMDL) — ver powerbi/README.md
+notebooks/ sql/ reports/       ainda vazios — ver ROADMAP
 ```
 
 **Princípios de projeto**
@@ -145,7 +169,68 @@ python -m pytest tests/ -v
 Os passos 1 e 2 são os únicos custosos (o passo 2 leva ~5 min; o 4, ~40 s). Os
 demais levam segundos porque operam sobre Parquet. O passo 1 pode ser
 interrompido e retomado: arquivos já baixados com tamanho coerente são pulados.
-A suíte de testes (151 testes) roda em ~28 s.
+A suíte de testes (480+ testes automatizados, pipeline + contrato de dados +
+estrutura do relatório Power BI).
+
+Para abrir e configurar o dashboard Power BI (parâmetro `pPowerBIDataRoot`,
+obrigatório uma vez por máquina), ver [`powerbi/README.md`](powerbi/README.md)
+e a seção "Power BI — Dashboard" abaixo.
+
+---
+
+## Power BI — Dashboard
+
+Projeto versionável nativamente no formato **PBIP** (Power BI Project) —
+modelo semântico em **TMDL**, relatório em **PBIR**, medidas em **DAX**.
+Não é um `.pbix` binário: todo o relatório é texto, revisável em diff.
+
+**Arquitetura pública final** — 3 páginas públicas, navegação **nativa por
+abas** (sem Page Navigator, bookmark ou botão customizado), mais 1 página
+técnica oculta:
+
+| Página | Visibilidade | Conteúdo |
+|---|---|---|
+| `00 — Homologação` | oculta (`HiddenInViewMode`) | auditoria técnica — nunca aparece para o público do dashboard |
+| `1 — Visão Executiva` | pública | KPIs globais de pontualidade/cancelamento, série temporal mensal |
+| `2 — Pontualidade e Cancelamentos` | pública | aprofundamento por operadora, ranking de cancelamento |
+| `3 — Impacto e Concentração` | pública | ICA5, Gini, curva de Lorenz, rankings de operadoras e aeroportos |
+
+Período coberto por todas as páginas públicas: **jan/2019 a jun/2026**, com
+**2026 sempre rotulado como parcial** (mesma regra da seção "Dados" acima) —
+a exclusão de 2026 vale só para o gráfico de evolução por ano fechado da
+página 3, nunca para os KPIs globais nem para a curva de Lorenz.
+
+Desenho completo de cada página, medidas DAX e decisões de modelagem:
+[`docs/especificacao_powerbi.md`](docs/especificacao_powerbi.md) (§13.4 para
+a arquitetura pública final tal como implementada).
+
+### Abrir o dashboard
+
+1. Instale uma **versão atual do Power BI Desktop** com suporte a projetos
+   PBIP e definições PBIR (Microsoft Store ou site oficial).
+2. Abra `powerbi/PontualidadeAviacaoBR.pbip`.
+3. Configure o parâmetro `pPowerBIDataRoot` (obrigatório, uma vez por
+   máquina) — procedimento completo em [`powerbi/README.md`](powerbi/README.md).
+4. **Atualizar dados** (Refresh) depois de configurar o parâmetro.
+
+### Testes do relatório Power BI
+
+Incluídos na suíte completa (`pytest -q`, seção "Reprodução" acima); para
+rodar só os do relatório:
+
+```bash
+pytest tests/test_pbir_report.py -q
+pytest tests/test_visao_executiva_pendencias.py -q
+pytest tests/test_pontualidade_cancelamentos_pendencias.py -q
+pytest tests/test_impacto_concentracao_pendencias.py -q
+pytest tests/test_navegacao_consistencia_pendencias.py -q
+```
+
+Eles validam a FORMA dos arquivos texto (JSON válido, IDs únicos, ausência
+de nomes técnicos visíveis, ausência de navegação customizada, nenhum
+caminho absoluto fora de `pPowerBIDataRoot`) — não o comportamento do motor
+do Power BI. Abrir o `.pbip` no Desktop continua sendo a única fonte de
+verdade sobre layout, refresh e cálculo DAX renderizado.
 
 ---
 
@@ -348,14 +433,14 @@ tabelas de topo 10 e o teste de estabilidade contra o histórico, em
 | Bloco C — aeroporto vs companhia (H2, P3, P6) | ✅ concluído |
 | **Bloco E — dimensões e intradiário (H3, H4, P8, KPI 2/3/5)** | ✅ **concluído** |
 | **Bloco F — priorização (P11)** | ✅ **concluído** |
-| Governança (git, README, roadmap, 151 testes) | ✅ concluído |
+| Governança (git, README, roadmap, 480+ testes automatizados) | ✅ concluído |
 | Validade da chegada / KPI 7 (decisão D1) | ✅ implementado e reconciliado |
 | Dimensão de companhia com vigência por registro (decisão D2) | ✅ implementado (corrigido nesta rodada) |
 | Escopo de operador / headline do KPI 6 (decisão D3) | ✅ implementado — `nao_classificado` (2,79%) segue sem reclassificação por falta de evidência |
 | Faixa horária `faixa_3h`/`periodo_dia` (decisão D4) | ✅ implementado |
 | Volumes mínimos separados por finalidade (decisão D4.1) | ✅ implementado |
 | Horizonte e elegibilidade do P11 (decisão D5) | ✅ implementado |
-| Figuras e dashboard (Bloco G) | ⬜ não iniciado — Power BI não iniciado, por instrução explícita |
+| Dashboard Power BI (Bloco G) — 3 páginas públicas + `00` oculta | ✅ concluído — ver "Power BI — Dashboard" acima; screenshots e publicação ainda pendentes |
 
 Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -376,3 +461,4 @@ Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | [`docs/eda_bloco_c.md`](docs/eda_bloco_c.md) | aeroporto vs companhia, decomposição de variância (H2), P3, P6 | **gerado** por `07_bloco_c_aeroporto_vs_companhia.py` |
 | [`docs/eda_bloco_f.md`](docs/eda_bloco_f.md) | priorização operacional (P11): elegibilidade, rankings paralelos, teste de estabilidade | **gerado** por `08_bloco_f_priorizacao.py` |
 | [`docs/eda_bloco_e.md`](docs/eda_bloco_e.md) | dimensões e intradiário: H3, H4, P8, KPI 2/3/5 | **gerado** por `09_bloco_e_dimensoes_intradiario.py` |
+| [`docs/especificacao_powerbi.md`](docs/especificacao_powerbi.md) | especificação técnica do modelo semântico e do relatório Power BI — páginas, medidas DAX, arquitetura pública final (§13.4) | escrito |

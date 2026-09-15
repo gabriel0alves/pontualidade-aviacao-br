@@ -22,7 +22,7 @@ declarado ali é **P1, P2, P3, P6, P8, P11** e **H1–H4**.
 | **D** | Concentração do impacto | H1, P2 | ✅ concluído |
 | **E** | Dimensões e intradiário | H3, H4, P8, KPI 2/3/5 | ✅ concluído |
 | **F** | Priorização | P11 | ✅ concluído |
-| **G** | Visualização e dashboard | — (comunicação) | ⬜ depende de B–F (não iniciado; Power BI não iniciado por instrução explícita) |
+| **G** | Visualização e dashboard | — (comunicação) | ✅ **dashboard concluído** (Power BI, 3 páginas públicas + `00` oculta) — ver `powerbi/README.md`; heatmap/priorização avulsos fora do escopo deliberado da V1 pública, que prioriza três páginas completas e homologadas |
 
 Blocos **B** e **C** foram definidos nesta auditoria (2026-08-17); antes existia
 apenas a numeração implícita dos scripts. A letra **D** foi mantida como está
@@ -230,17 +230,32 @@ de **potencial**, sob premissa declarada, não de economia garantida.
 
 ---
 
-## Bloco G — Visualização ⬜
+## Bloco G — Visualização e dashboard ✅
 
-`matplotlib` e `duckdb` estão pinados em `requirements.txt` e **nunca foram
-importados**; `notebooks/`, `sql/`, `powerbi/` e `reports/figures/` estão
-vazios.
+~~`matplotlib` e `duckdb` estão pinados em `requirements.txt` e **nunca
+foram importados**; `notebooks/`, `sql/`, `powerbi/` e `reports/figures/`
+estão vazios.~~ **Superado:** `powerbi/` não está mais vazio — a
+visualização foi entregue como um **dashboard Power BI de 3 páginas
+públicas** (`powerbi/`, ver `powerbi/README.md` e
+`docs/especificacao_powerbi.md` §13.4), decisão tomada em rodada posterior
+a este roadmap. `matplotlib`/`duckdb` seguem pinados sem uso — a
+visualização não precisou de figuras estáticas avulsas geradas por script.
 
-**Entregar:** curva de Lorenz do impacto, série temporal com 2026 hachurado,
-heatmap hora × aeroporto, ranking de priorização. Só depois o dashboard.
+Do que estava listado para "Entregar" abaixo, a curva de Lorenz do impacto
+e a série temporal (com 2026 marcado como parcial) estão cobertas pelo
+dashboard (páginas 1, 2 e 3). O heatmap hora × aeroporto e o ranking de
+priorização, junto com as páginas 4–7 do desenho original de 7 páginas,
+ficam **fora do escopo deliberado da V1 pública, que prioriza três páginas
+completas e homologadas** em vez de sete parciais
+(`docs/especificacao_powerbi.md` §13.5, item 3).
 
-**Regra obrigatória em todo visual:** 2026 com marcação distinta e nota de ano
-parcial.
+**Entregar (registro original do planejamento):** curva de Lorenz do
+impacto, série temporal com 2026 hachurado, heatmap hora × aeroporto,
+ranking de priorização. Só depois o dashboard.
+
+**Regra obrigatória em todo visual:** 2026 com marcação distinta e nota de
+ano parcial — cumprida no dashboard (badge "2026 parcial" em cada página
+pública).
 
 ---
 
