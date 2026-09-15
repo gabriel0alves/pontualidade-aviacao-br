@@ -7,7 +7,7 @@ especificacao_powerbi.md`) e testes. Nenhum `visual.json`, `page.json`,
 TMDL, DAX, Power Query, relacionamento ou Parquet foi alterado -- ver
 `test_nenhum_arquivo_de_pagina_alterado_no_c3` e
 `test_nenhum_semanticmodel_alterado_no_c3` abaixo, que travam essa
-alegacao contra o commit-base do Lote C2 (`71296b3`).
+alegacao contra o commit-base do Lote C2 (`5d11df7`).
 
 Auditoria de consistencia entre as paginas 1, 2 e 3 (feita nesta rodada,
 sem alterar nenhum visual): a identidade visual (canvas, cabecalho navy,
@@ -40,21 +40,21 @@ SEMANTIC_DIR = POWERBI_DIR / "PontualidadeAviacaoBR.SemanticModel"
 PAGES_DIR = REPORT_DIR / "definition" / "pages"
 DOC_ESPECIFICACAO = RAIZ / "docs" / "especificacao_powerbi.md"
 
-COMMIT_BASE_C2 = "71296b3"
+COMMIT_BASE_C2 = "5d11df7"
 # HEAD do Lote C3 (fim do lote anterior a este) -- usado para travar, entre
 # DOIS COMMITS FIXOS (nao commit-base vs. working tree), o que o Lote C3
 # realmente tocou. Comparar contra working tree faria esses testes falharem
 # para sempre a partir do primeiro lote seguinte que legitimamente editasse
 # Report/SemanticModel/README (como o D0.1 edita 4 visual.json) -- bug
 # encontrado e corrigido no proprio D0.1.
-COMMIT_C3 = "46b17b5"
+COMMIT_C3 = "1858f79"
 # HEAD do Lote D0.1 (commit "fix(powerbi): corrige periodo exibido para
 # jan/2019"). Par com COMMIT_D01 abaixo: mesmo padrao do COMMIT_BASE_C2/
 # COMMIT_C3 acima -- dois commits FIXOS, nao commit-base vs. working tree,
 # para o teste continuar valido depois que o D1 editar README.md/
 # powerbi/README.md legitimamente.
-COMMIT_BASE_D01 = "46b17b5"
-COMMIT_D01 = "610c47f"
+COMMIT_BASE_D01 = "1858f79"
+COMMIT_D01 = "7e40e26"
 
 ID_PAGINA_00 = "c9a11a04c00a13a84573"
 ID_PAGINA_1 = "ac8a1c757eb2fc495fda"
@@ -502,7 +502,7 @@ def test_nenhum_nome_tecnico_visivel_nas_3_paginas_publicas() -> None:
 
 
 def test_nenhum_arquivo_de_pagina_alterado_no_c3() -> None:
-    """Compara DOIS COMMITS FIXOS (71296b3..46b17b5 -- o intervalo exato do
+    """Compara DOIS COMMITS FIXOS (5d11df7..1858f79 -- o intervalo exato do
     Lote C3), nao commit-base vs. working tree -- assim o teste continua
     valido para sempre, mesmo depois que um lote posterior (D0.1) editar
     Report legitimamente."""
@@ -594,7 +594,7 @@ def test_documentacao_nao_alterou_readme_nesta_etapa() -> None:
 
 
 def test_readme_nao_alterado_no_d01() -> None:
-    """Dois commits fixos (46b17b5..610c47f) -- o D0.1 realmente foi so'
+    """Dois commits fixos (1858f79..7e40e26) -- o D0.1 realmente foi so'
     correcao de texto/teste, README nao mudou nesse intervalo. O D1
     seguinte edita README.md/powerbi/README.md legitimamente; comparar
     contra working tree faria este teste falhar para sempre a partir do
