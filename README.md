@@ -446,7 +446,7 @@ tabelas de topo 10 e o teste de estabilidade contra o histórico, em
 | Faixa horária `faixa_3h`/`periodo_dia` (decisão D4) | ✅ implementado |
 | Volumes mínimos separados por finalidade (decisão D4.1) | ✅ implementado |
 | Horizonte e elegibilidade do P11 (decisão D5) | ✅ implementado |
-| Dashboard Power BI (Bloco G) — 3 páginas públicas + `00` oculta | ✅ concluído — ver "Power BI — Dashboard" acima; screenshots e publicação ainda pendentes |
+| Dashboard Power BI (Bloco G) — 3 páginas públicas + `00` oculta | ✅ concluído — ver "Power BI — Dashboard" acima; publicação (push do repositório) ainda pendente |
 
 Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -468,3 +468,16 @@ Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 | [`docs/eda_bloco_f.md`](docs/eda_bloco_f.md) | priorização operacional (P11): elegibilidade, rankings paralelos, teste de estabilidade | **gerado** por `08_bloco_f_priorizacao.py` |
 | [`docs/eda_bloco_e.md`](docs/eda_bloco_e.md) | dimensões e intradiário: H3, H4, P8, KPI 2/3/5 | **gerado** por `09_bloco_e_dimensoes_intradiario.py` |
 | [`docs/especificacao_powerbi.md`](docs/especificacao_powerbi.md) | especificação técnica do modelo semântico e do relatório Power BI — páginas, medidas DAX, arquitetura pública final (§13.4) | escrito |
+
+---
+
+## Licença
+
+Código e documentação deste repositório são autorais e distribuídos sob a
+licença **MIT** (ver [`LICENSE`](LICENSE)).
+
+Os **dados** não são redistribuídos por este repositório — nenhum CSV ou
+Parquet é versionado no Git. Os microdados **VRA** são obtidos diretamente da
+**ANAC** (ver seção "Dados" acima) e permanecem sujeitos aos termos da fonte
+oficial; a licença MIT deste repositório cobre o código e a documentação, não
+os dados de origem.

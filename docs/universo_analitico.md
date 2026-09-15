@@ -278,6 +278,6 @@ companhias                    : 130
 aeroportos (origem)           : 292
 rotas                         : 3,737
 
-gravado: D:\Projetos\PortifolioAnaliseDeDados\pontualidade-aviacao-br\data\processed\voos.parquet
+gravado: data/processed/voos.parquet
 tamanho: 164.2 MB
 ```
