@@ -33,6 +33,8 @@ ANAC.
 - **Stack:** Python, pandas, PyArrow · Power BI (PBIP/PBIR, TMDL, DAX) ·
   pytest.
 
+![Visão Executiva do dashboard de pontualidade da aviação brasileira, com KPIs e evolução temporal.](docs/assets/powerbi/powerbi-01-visao-executiva.png)
+
 ---
 
 ## Objetivo
@@ -194,6 +196,10 @@ técnica oculta:
 | `1 — Visão Executiva` | pública | KPIs globais de pontualidade/cancelamento, série temporal mensal |
 | `2 — Pontualidade e Cancelamentos` | pública | aprofundamento por operadora, ranking de cancelamento |
 | `3 — Impacto e Concentração` | pública | ICA5, Gini, curva de Lorenz, rankings de operadoras e aeroportos |
+
+![Página de Pontualidade e Cancelamentos, com atraso severo, série temporal e comparação por operadora.](docs/assets/powerbi/powerbi-02-pontualidade-cancelamentos.png)
+
+![Página de Impacto e Concentração, com ICA5, Gini, curva de Lorenz e rankings de operadoras e aeroportos.](docs/assets/powerbi/powerbi-03-impacto-concentracao.png)
 
 Período coberto por todas as páginas públicas: **jan/2019 a jun/2026**, com
 **2026 sempre rotulado como parcial** (mesma regra da seção "Dados" acima) —
