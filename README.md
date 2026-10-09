@@ -446,7 +446,7 @@ tabelas de topo 10 e o teste de estabilidade contra o histórico, em
 | Faixa horária `faixa_3h`/`periodo_dia` (decisão D4) | ✅ implementado |
 | Volumes mínimos separados por finalidade (decisão D4.1) | ✅ implementado |
 | Horizonte e elegibilidade do P11 (decisão D5) | ✅ implementado |
-| Dashboard Power BI (Bloco G) — 3 páginas públicas + `00` oculta | ✅ concluído — ver "Power BI — Dashboard" acima; publicação (push do repositório) ainda pendente |
+| Dashboard Power BI (Bloco G) — 3 páginas públicas + `00` oculta | ✅ concluído e publicado no GitHub — ver "Power BI — Dashboard" acima |
 
 Sequência detalhada em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

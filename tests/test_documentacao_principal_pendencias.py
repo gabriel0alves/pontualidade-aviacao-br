@@ -145,6 +145,21 @@ def test_roadmap_bloco_g_marcado_como_concluido_sem_soar_incompleto() -> None:
         )
 
 
+def test_readme_nao_afirma_publicacao_pendente_e_declara_publicado_no_github() -> None:
+    """Pos-D4.6 (push da main para o GitHub): a tabela 'Estagio atual e
+    proximos passos' nao deve mais afirmar que a publicacao esta pendente --
+    o repositorio publico ja existe e recebeu o primeiro push."""
+    texto = README.read_text(encoding="utf-8")
+    assert "publicação (push do repositório) ainda pendente" not in texto, (
+        "README.md nao deveria mais afirmar que a publicacao esta pendente -- "
+        "o push para o GitHub ja foi realizado"
+    )
+    assert "concluído e publicado no GitHub" in texto, (
+        "README.md deveria declarar que o dashboard/repositorio publico "
+        "estao concluidos e publicados no GitHub"
+    )
+
+
 def test_roadmap_preserva_registro_original_do_bloco_g() -> None:
     """Nao apagar o que foi planejado originalmente -- so reformular como
     escopo deliberadamente fora da V1 publica."""
